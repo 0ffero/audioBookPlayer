@@ -1,0 +1,145 @@
+{
+	"textures": [
+		{
+			"image": "ui",
+			"format": "RGBA8888",
+			"size": {
+				"w": 458,
+				"h": 426
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "volumeImage",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 454,
+						"h": 370
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 454,
+						"h": 370
+					},
+					"frame": {
+						"x": 2,
+						"y": 2,
+						"w": 454,
+						"h": 370
+					}
+				},
+				{
+					"filename": "closeFileList",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 48,
+						"h": 48
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 48,
+						"h": 48
+					},
+					"frame": {
+						"x": 2,
+						"y": 376,
+						"w": 48,
+						"h": 48
+					}
+				},
+				{
+					"filename": "moveAll",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 48,
+						"h": 48
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 48,
+						"h": 48
+					},
+					"frame": {
+						"x": 54,
+						"y": 376,
+						"w": 48,
+						"h": 48
+					}
+				},
+				{
+					"filename": "addAllIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 46,
+						"h": 33
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 46,
+						"h": 33
+					},
+					"frame": {
+						"x": 106,
+						"y": 376,
+						"w": 46,
+						"h": 33
+					}
+				},
+				{
+					"filename": "folderIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 41,
+						"h": 33
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 41,
+						"h": 33
+					},
+					"frame": {
+						"x": 156,
+						"y": 376,
+						"w": 41,
+						"h": 33
+					}
+				},
+				{
+					"filename": "audioFileIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 26,
+						"h": 33
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 26,
+						"h": 33
+					},
+					"frame": {
+						"x": 201,
+						"y": 376,
+						"w": 26,
+						"h": 33
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://free-tex-packer.com",
+		"version": "0.6.7"
+	}
+}

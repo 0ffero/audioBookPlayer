@@ -1,0 +1,49 @@
+<!--
+    Audio Book Player by offer0, OCT 2022 (v1)
+
+    ***    REQUIREMENTS    ***
+    A folder named AudioBooks in the main folder (where index.html is):
+    If you dont want your audio book collection in the main folder,
+        you can add a folder link called AudioBooks instead (the way my home version is set up) - No vhosts needed!
+    Inside that folder is where you put each book folder.
+    ie ./AudioBooks/[Book Name]
+    eg ./AudioBooks/Aliens  --- inside which are 1) audio book files and/or 2) more (sub)folders
+
+    PHP is used to get the folder listings
+    *** END OF REQUIREMENTS ***
+
+    The audio book player was created using Phaser 3.55.2
+    It currently runs at 2560x1440
+    V1.x+ will allow it to runs at half resolution as older iGPUs die under the stress
+    The option is there to remove fade in and fade outs as theyre very intensive
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AudioBookPlayer</title>
+    <link rel="shortcut icon" href="favicon.png" type="image/png">
+    <style type="text/css">
+        body { background-color: #111111; margin: 0; padding: 0 }
+    </style>
+
+    <!-- FRAMEWORK & MISC SCRIPTS //-->
+    <script src="js/frameworks/phaser.js"></script>
+    <script src="js/miscFunctions.js"></script>
+
+    <!-- GAME SCRIPTS //-->
+    <script src="js/consts.js"></script>
+    <script src="js/vars.js"></script>
+
+    <script defer src="js/update.js"></script>
+
+    <!-- CLASSES //-->
+    <script src="js/classes/HTTPRequest.js"></script>
+    <script src="js/classes/AudioPlayer.js"></script>
+    <script src="js/classes/FileList.js"></script>
+    <script src="js/classes/FolderList.js"></script>
+    <script src="js/classes/ScreenSaver.js"></script>
+
+    <!-- THE SCRIPT THAT STARTS EVERYTHING //-->
+    <script defer src="js/init.js"></script>
+</head><body></body></html>

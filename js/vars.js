@@ -1,0 +1,909 @@
+"use strict"
+var vars = {
+    DEBUG: true,
+
+    version: 0.92,
+    webgl: true, // note, you cant tint stuff when webgl is disabled
+
+    TODO: [],
+
+    animationsEnabled: true,
+
+    fonts: {
+        default:  { fontFamily: 'Consolas', fontSize: '24px', color: '#ffffff' },
+        stroke : { stroke: '#000000', strokeThickness: 3 },
+        colours: {
+            default: 0x666666,
+            bright_1: 0x999999,
+            white: 0xffffff
+        }
+    },
+
+    init: (_phase)=> {
+        switch (_phase) {
+            case 'PRELOAD': // PRELOADS
+                vars.files.loadAssets();
+                vars.localStorage.init();
+                break;
+            case 'CREATE': // CREATES
+                vars.anims.init();
+                vars.audio.init();
+                vars.containers.init();
+                vars.groups.init();
+                vars.input.init();
+                vars.UI.init();
+                break;
+            case 'STARTAPP': // GAME IS READY TO PLAY
+                vars.App.init();
+            break;
+
+            default:
+                console.error(`Phase (${_phase}) was invalid!`);
+                return false;
+            break;
+        }
+    },
+
+    files: {
+        audio: {
+            load: ()=> {
+
+            }
+        },
+
+        fonts: {
+            load: ()=> {
+                //scene.load.bitmapFont('default', 'fonts/defaultFont.png','fonts/defaultFont.xml');
+            }
+        },
+
+        images: {
+            load: ()=> {
+                scene.load.image('whitepixel', 'images/whitepixel.png');
+                // PLAYER
+                scene.load.atlas('player', 'images/player.png', 'images/player.json');
+                // SCREEN SAVER
+                scene.load.atlas('screenSaver', 'images/screenSaver.png', 'images/screenSaver.json');
+                // UI
+                scene.load.atlas('ui', 'images/ui.png', 'images/ui.json');
+            }
+        },
+
+        plugins: {
+            load: ()=> {
+                vars.webgl && scene.load.plugin('rexglowfilterpipelineplugin', 'plugins/rexglowfilterpipelineplugin.min.js', true);
+            }
+        },
+
+        loadAssets: ()=> {
+            scene.load.setPath('assets');
+
+            let fV = vars.files;
+            fV.audio.load();
+            //fV.fonts.load();
+            fV.images.load();
+            fV.plugins.load();
+            scene.load.setPath('');
+        }
+    },
+
+    containers: {
+        fileListOffsets: { x: 120, y: 60 },
+
+        init: ()=> {
+            let depths = consts.depths;
+            !scene.containers ? scene.containers = {} : null;
+            scene.containers.popup = scene.add.container().setName('popup').setDepth(depths.popup);
+        },
+
+        bringFileListToTop: (_container)=> {
+            let depths = consts.depths;
+            // THIS NEXT LINE DOESNT WORK FOR SOME REASON!
+            //if (_container.depth===depths.fileListOnTop) return false;
+            let containerID = _container.ID;
+            vars.DEBUG && console.log(`📦 Bringing the container with ID ${containerID} top top.`);
+
+            let fLs = vars.App.fileLists;
+            let fLO = vars.App.fileListAddOrder;
+            for (let fL in fLs) {
+                let depth = fL===containerID ? depths.fileListOnTop : depths.fileList;
+                fLs[fL].container.depth=depth;
+                if (depths.fileListOnTop) {                             // update the fLOs
+                    let index = fLO.findIndex((m=>m===containerID));    // find the index of this container
+                    let val = fLO.splice(index,1)[0];                   // grab the value at that index
+                    fLO.push(val);                                      // and push it back ontothe end of the array
+                };
+            };
+
+        },
+
+        closeFileListContainer: (_container)=> {
+            let containerID = _container.ID;
+            vars.DEBUG && console.log(`Closing File List container with the ID ${containerID}`);
+
+            // destroy the container, remove its name from the filelistsAvail array
+            let fL = vars.App.fileLists[containerID];
+            fL.destroy();
+            delete(vars.App.fileLists[containerID]); // and remove it from fileLists
+
+            let fLO = vars.App.fileListAddOrder;
+            if (!fLO.length) return false; // no containers left? exit.
+
+
+
+            // find the next container on top and set it to "actually" on top
+            let containerName = fLO.pop();
+            fLO.push(containerName);
+            let container = vars.App.fileLists[containerName].container;
+            if (!container) {
+                console.warn(`Unable to find the container with ID ${containerName}`);
+                return false;
+            };
+            vars.containers.bringFileListToTop(container);
+        },
+
+        fadeIn: (_containerName='', _in=true, _alpha=null, _duration=500)=> {
+            let alpha = _in ? (_alpha ? _alpha : 0.95) : 0;
+            if (!scene.containers[_containerName]) return false;
+
+            let container = scene.containers[_containerName];
+
+            // if animations are disabled we simply set the new alpha
+            if (!vars.animationsEnabled) {
+                container.setAlpha(alpha);
+                return 0;
+            }
+
+            // make sure theres not already a tween
+            if (container.tween) { // there is, remove it
+                container.tween.remove();
+                delete(container.tween);
+            };
+
+            // tween the container to the required alpha
+            container.tween = scene.tweens.add({
+                targets: container, alpha: alpha, duration: _duration,
+                onComplete: (_t,_o)=> { delete(_o[0].tween); }
+            });
+            return _duration;
+        }
+    },
+
+    groups: {
+        init: ()=> {
+            scene.groups = { };
+        }
+    },
+
+    localStorage: {
+        pre: 'ABP_',
+        recentPlaylists: [],
+
+        // Example play list
+        /*  REAL EXAMPLE
+            playlists[574397742789] = 
+            {
+                folder: 'Stephen King/1408/',
+                tracks: [
+                    '01 - Intro.mp4',
+                    '02 - Chapter 1.mp4',
+                    '03 - Chapter 2.mp4',
+                    'etc',
+                    '18 - Chapter 19.mp4',
+                    'etc'
+                ],
+                currentTrack: 0, // '18 - Chapter 19.mp4',
+                currentTrackLength: 283412, // length in seconds
+                position: 0.8041,
+                complete: false,
+                dateCreated: Date(Mon Oct 03 2022 10:03:54 GMT+0100 (British Summer Time))
+                dateLastAccessed: Date(Mon Oct 03 2022 22:03:54 GMT+0100 (British Summer Time)),
+            }
+        */
+        playlists: {},
+
+        init: ()=> {
+            let lS = window.localStorage;
+            let lV = vars.localStorage;
+
+            let pre = lV.pre;
+
+            !lS[pre + 'playlists'] && (lS[pre + 'playlists'] = '{}');
+            lV.playlists = JSON.parse(lS[pre + 'playlists']);
+
+            JSON.stringify(lV.playlists)!=='{}' && lV.generateRecentList();
+
+        },
+
+        generateCRCString: (_folder=null, _files=null)=> {
+            vars.DEBUG && console.log(`💾 Generating CRC String`);
+            return `${_folder}±` + _files.join('º');
+        },
+
+        generateRecentList: ()=> {
+            let lV = vars.localStorage;
+            let list = lV.playlists;
+            let oneMil = 1000000;
+            let orderedList = [];
+            let now = new Date();
+            for (let crc in list) {
+                if (!list[crc].dateLastAccessed) { // date last accessed doesnt exist, create it
+                    list[crc].dateLastAccessed = new Date();
+                    list[crc].dateCreated = new Date();
+                    //                fake the hms rs val and attach it to the other details
+                    orderedList.push({...{h:0,m:0,s:0}, ...{ crc: crc, folder: list[crc].folder, time: 0, trackCount: list[crc].tracks.length, currentTrack: list[crc].currentTrack, currentTrackLength: list[crc].currentTrackLength, position: (list[crc].position*oneMil|0)/oneMil }});
+                } else {
+                    let tS = (now - new Date(list[crc].dateLastAccessed))/1000;
+                    let rs=convertSecondsToHMS(tS,true);
+                    orderedList.push({...rs, ...{ crc: crc, folder: list[crc].folder, time: tS, trackCount: list[crc].tracks.length, currentTrack: list[crc].currentTrack, currentTrackLength: list[crc].currentTrackLength, position: (list[crc].position*oneMil|0)/oneMil }});
+                };
+            };
+
+            lV.recentPlaylists = arraySortByKey(orderedList,'time');
+        },
+
+        savePlaylist: ()=> {
+            vars.DEBUG && console.log(`💾 Saving playlist`);
+            let lS = window.localStorage;
+            let lV  = vars.localStorage;
+
+            let pre = lV.pre;
+            lS[pre + 'playlists'] = JSON.stringify(lV.playlists);
+        },
+
+        updateSavedPlaylist: ()=> {
+            vars.DEBUG && console.log(`💾 Updating playlist \n(this now simply calls savePlaylist as each playlist is modified on the fly, hence they just need saving)`);
+            if (Object.keys(vars.localStorage.playlists).includes('null')) {
+                let error = `updateSavedPlaylist was called but theres an invalid (null) entry.\nPausing execution.\nThis can happen when a playlist is saved without a crc (not sure why, hence the error popup)`;
+                alert(error);
+                console.error(error);
+                debugger;
+                return false;
+            }
+            vars.localStorage.savePlaylist();
+        }
+    },
+
+
+
+    App: {
+        ready: false,
+
+        folderList: null,
+        foldersWithFileLists: [],
+        fileListAddOrder: [],
+        fileLists: {
+            
+        },
+
+        player: null,
+
+        init: ()=> {
+            vars.DEBUG && console.log(`🟩🟩🟩🟩🟩🟩🟩🟩\n%c FN: App > init\n%c🟩🟩🟩🟩🟩🟩🟩🟩\n`, `${consts.console.defaults} ${consts.console.colours.important}`, 'font: default' );
+
+            new HTTPRequest('getFolder.php'); // these requests are self contianed, so we dont have to set them to a variable
+
+            let App = vars.App;
+            App.player = new AudioPlayer({ x: 0, y: 0, containerX: 1900, containerY: 20 } ); // create the audio player
+            App.screenSaver = new ScreenSaver(); // create the screen saver
+        },
+
+        generateSafeFolderName: (_folderName)=> {
+            let safeFolderName = '';
+            _folderName.split('').forEach((_l)=> {
+                if ((_l.charCodeAt(0) >= 48 && _l.charCodeAt(0) <= 58) || (_l.charCodeAt(0) >= 65 && _l.charCodeAt(0) <= 90) || (_l.charCodeAt(0) >= 97 && _l.charCodeAt(0) <= 122)) { safeFolderName+=_l; };
+            });
+            return safeFolderName;
+        },
+
+        generateTimeString: (_cPos, _fPos)=> {
+            let position = '';
+            let cPos = _cPos; let fPos = _fPos;
+            cPos.h && (position += `${cPos.h}:`);
+            position+=`${cPos.m.toString().padStart(2,'0')}:${cPos.s.toString().padStart(2,'0')} / `;
+            fPos.h && (position += `${fPos.h}:`);
+            position+=`${fPos.m.toString().padStart(2,'0')}:${fPos.s.toString().padStart(2,'0')}`;
+
+            return position;
+        }
+
+
+    },
+
+    // GAME/APP
+    anims: {
+        init: ()=> {
+            vars.DEBUG ? console.log(`%cFN: anims > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+            
+        }
+    },
+
+    audio: {
+        available: [],
+
+        init: ()=> {
+            vars.DEBUG ? console.log(`%cFN: audio > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+
+            scene.sound.volume = vars.DEBUG ? 0.1 : 0.4;// keep it nice and quiet while debuging
+        },
+
+        changeVolume: (_increase=true)=> {
+            switch (_increase) {
+                case true: scene.sound.volume=clamp(((scene.sound.volume*10)+1)/10,0,1); break;
+                case false: scene.sound.volume=clamp(((scene.sound.volume*10)-1)/10,0,1); break;
+            };
+
+            console.log(`🔉 New volume ${scene.sound.volume}`);
+        },
+
+        playSound: (_key)=> {
+            vars.DEBUG ? console.log(`%c .. FN: audio > playSound`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+
+            scene.sound.play(_key);
+        },
+    },
+
+    camera: {
+        panning: false,
+
+        // cameras
+        mainCam: null,
+
+        init: ()=> {
+            vars.DEBUG ? console.log(`%cFN: camera > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+            vars.camera.mainCam = scene.cameras.main;
+        }
+    },
+
+    input: {
+        cursors: null,
+        locked: false,
+
+        init: ()=> {
+            vars.DEBUG ? console.log(`%cFN: input > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+
+            scene.input.on('pointermove', function (pointer) {
+                if (scene.input.mouse.locked) {
+                    let gameObject = vars.App.folderList.container;
+
+                    let mY = pointer.movementY;
+                    if (gameObject.y+mY>0) { gameObject.y=0; return; };
+                    if (gameObject.y+mY<gameObject.maxY) { gameObject.y=gameObject.maxY; return; };
+                    gameObject.y+=pointer.movementY/consts.foldersScrollScaler;
+                };
+
+                // reset the screensaver timeout in player
+                vars.App.player.resetScreenSaverTimeout();
+            });
+
+            vars.input.initKeys();
+
+            // phaser objects
+            scene.input.on('gameobjectdown', function (pointer, gameObject) {
+                let name = gameObject.name;
+
+                let ignoreList = ['fileListContainer','folderListContainer','scrollBar','scrollBarPlayer'];
+                if (ignoreList.includes(name)) {
+                    if (name==='folderListContainer') { vars.input.lockCursorSwitch(); return false; };
+                    if (pointer.button===mouseButtons.RIGHT) {
+                        vars.input.closeFileList(gameObject);
+                        return;
+                    };
+                    return false;
+                };
+
+
+                // MAIN INTERFACE
+                // FOLDER LIST
+                if (name.startsWith('folder_')) {
+                    vars.input.folderClick(gameObject);
+                    return;
+                };
+                // END OF FOLDER LIST BUTTONS
+
+
+                // FILE LIST
+                if (name.startsWith('file_')) {
+                    let folderName = gameObject.getData('folderName');
+                    let fileName = gameObject.getData('fileName');
+
+                    vars.DEBUG && console.log(`Folder Name: ${folderName}\nFile Name: ${fileName}`);
+                    vars.input.addFileToPlayer(fileName,folderName);
+                    return;
+                };
+                if (name === 'addAll') {
+                    // TODO -   THIS WILL EVENTUALLY BE MOVE
+                    //          INTO ITS OWN FUNCTION CALLED addAllFilesToPlayer
+                    vars.UI.showPopup(true, 'Adding all files to player\n\nPlease Wait.');
+
+                    scene.tweens.addCounter({
+                        from: 0, to: 1, duration: 500,
+                        onComplete: ()=> { vars.input.addAllFilesToPlayer(gameObject); }
+                    });
+
+                    return true;
+                };
+                if (name==='close_filelist') {
+                    let container = vars.App.fileLists[gameObject.forContainerID].container;
+
+                    if (!container) {
+                        console.warn(`Unable to find the container with ID ${gameObject.forContainerID}`);
+                        return false;
+                    };
+
+                    vars.input.closeFileList(container);
+                    return true;
+                };
+                // END OF FILE LIST
+
+
+                // PLAYER BUTTONS
+                if (name==='binAllFiles') {
+                    let player = vars.App.player;
+                    player.emptyGroup();
+                    player.stopAndDestroyCurrentTrack();
+                    return true;
+                };
+                if (name==='info') { // only shows the screen saver (book over view) if a track is playing
+                    let player = vars.App.player;
+                    player.track && player.playing && vars.containers.fadeIn('screenSaver',true,1);
+                    return;
+                };
+                if (name==='pause') {
+                    vars.App.player.pause();
+                    return true;
+                };
+                if (name==='play') {
+                    vars.App.player.play();
+                    return true;
+                };
+                if (name.startsWith('player_track_')) {
+                    let trackIndex = name.replace('player_track_','')|0;
+                    let player = vars.App.player;
+                    player.setCurrentTrack(trackIndex+1,0);
+                    player.drawPlaylist(player.folder);
+                    return;
+                };
+                if (name==='recentButton') {
+                    if (gameObject.alpha!==1) return false;
+                    vars.containers.fadeIn('recentList',true,1);
+                    return;
+                };
+                if (name==='skipBack' || name==='skipForward') {
+                    vars.DEBUG && console.log(`${name} clicked`);
+                    if (pointer.button===mouseButtons.LEFT) { vars.App.player.skip(gameObject.skip); }
+                    if (pointer.button===mouseButtons.RIGHT) { vars.input.rightClickSkip(gameObject); } // right click on a skip button (changes the skip amount)
+                    return true;
+                };
+                if (name.includes('Track')) {
+                    let player = vars.App.player;
+
+                    switch (name) {
+                        case 'nextTrack':
+                            player.getNextOrPreviousTrack();
+                        break;
+
+                        case 'previousTrack':
+                            player.getNextOrPreviousTrack(false);
+                        break;
+                    };
+                    return;
+                };
+                // END OF PLAYER BUTTONS
+
+
+                // RECENT CONTAINER buttons
+                if (name==='loadRecent') {
+                    let fD = gameObject.folderData;
+                    let crc = fD.crc;
+                    let files = vars.localStorage.playlists[crc].tracks;
+                    let folder = fD.folder;
+                    gameObject.setData({ files: files, folder: folder, crc: crc });
+                    vars.containers.fadeIn('recentList',false);
+                    vars.input.addAllFilesToPlayer(gameObject);
+                    return;
+                };
+                if (name==='recentBG') {
+                    vars.containers.fadeIn('recentList',false);
+                    return;
+                };
+                // END OF RECENT CONTAINER BUTTONS
+                
+
+                // SCREEN SAVER BUTTONS
+                if (name==='internetSearch') {
+                    vars.App.screenSaver.searchForBookImages();
+                    return true;
+                };
+                if (name==='screenSaverBG') {
+                    vars.App.screenSaver.hide();
+                    return;
+                };
+                // END OF SCREEN SAVER BUTTONS
+                
+
+                console.warn(`Unknown object with name ${name} clicked.`)
+            });
+            scene.input.on('gameobjectup', function (pointer, gameObject) {
+                let name = gameObject.name;
+                if (name==='folderListContainer') {
+                    vars.input.lockCursorSwitch(false);
+                };
+            });
+
+            scene.input.on('gameobjectover', function (pointer, gameObject) {
+                let name = gameObject.name;
+                if (name.startsWith('folder_')) {
+                    gameObject.setTint(vars.fonts.colours.white);
+                };
+                // GLOWS ON
+                if (vars.webgl && gameObject.glow) { let glow = name==='trackPositionPointer' ? 0.02 : 0.005; gameObject.glow.setIntensity(glow); return; };
+            });
+
+            scene.input.on('gameobjectout', function (pointer, gameObject) {
+                let name = gameObject.name;
+                if (name.startsWith('folder_')) {
+                    gameObject.setTint(vars.fonts.colours.bright_1);
+                };
+                // GLOWS OFF
+                if (gameObject.glow) { gameObject.glow.setIntensity(0); return; };
+            });
+
+            vars.input.initDrags();
+        },
+        initDrags: ()=> {
+            scene.input.on('dragstart', function (pointer, gameObject) {
+
+                let oName = gameObject.name;
+
+                if (oName.startsWith('scrollBar')) return false;
+
+                switch (oName) {
+                    case 'fileListContainer': case 'folderListContainer':
+                        gameObject.isDragging=true;
+                        vars.containers.bringFileListToTop(gameObject);
+                        game.canvas.style.cursor='grabbing';
+                    break;
+
+                    case 'volumeSlider': break; // ignore the drag start for this object
+
+                    default:
+                        console.error(`DRAG END for ${oName} not found!`);
+                        debugger;
+                    break;
+                };
+            });
+
+            scene.input.on('drag', function (pointer, gameObject, dragX, dragY) {
+                let oName = gameObject.name;
+                switch (oName) {
+                    case 'fileListContainer':
+                        //dragX < gameObject.minX ? dragX=gameObject.minX : dragX > gameObject.maxX ? dragX=gameObject.maxX : dragX;
+                        gameObject.setPosition(dragX,dragY);
+                    break;
+
+                    case 'folderListContainer':
+                        /*dragY < gameObject.maxY && (dragY=gameObject.maxY);
+                        dragY > 0 && (dragY=0);
+                        gameObject.y=dragY;*/
+                    break;
+
+                    case 'scrollBar':
+                        dragY < gameObject.minY ? dragY=gameObject.minY : dragY > gameObject.maxY ? dragY=gameObject.maxY : dragY;
+                        gameObject.y = dragY;
+                        // now we have to show the appropriate set of files
+                        vars.App.fileLists[gameObject.forContainerID].scrollBarShowFiles();
+                        return true;
+                    break;
+
+                    case 'scrollBarPlayer':
+                        dragY < gameObject.minY ? dragY=gameObject.minY : dragY > gameObject.maxY ? dragY=gameObject.maxY : dragY;
+                        gameObject.y = dragY;
+                        vars.App.player.scrollBarShowFiles();
+                        return true;
+                    break;
+
+                    case 'volumeSlider':
+                        
+                    break;
+
+                    default:
+                        console.error(`DRAG for ${oName} not found!`);
+                        debugger;
+                    break;
+                };
+            });
+
+            scene.input.on('dragend', function (pointer, gameObject, dragX, dragY) {
+                let oName = gameObject.name;
+
+                switch (oName) {
+                    case 'fileListContainer': case 'folderListContainer':
+                        gameObject.isDragging = false;
+                        game.canvas.style.cursor='default';
+                    break;
+                }
+            });
+        },
+        initKeys: ()=> {
+            let iV = vars.input;
+            // initialise cursors
+            iV.cursors = scene.input.keyboard.createCursorKeys();
+
+            // all keys are defined here
+            scene.input.keyboard.on('keydown-DELETE', ()=> {
+                vars.DEBUG && console.log(`Closing top most file list`);
+                let fLs = vars.App.fileLists;
+                if (!Object.keys(fLs)) return false; // there are no file lists, exiting gracefully
+
+                let found=false;
+                for (let fL in fLs) {
+                    if (!found && fLs[fL].container.depth===consts.depths.fileListOnTop) {
+                        iV.closeFileList(fLs[fL].container);
+                        found = true;
+                    };
+                };
+            });
+            
+            scene.input.keyboard.on('keydown-UP', ()=> {
+                vars.audio.changeVolume();
+            });
+            scene.input.keyboard.on('keydown-DOWN', ()=> {
+                vars.audio.changeVolume(false);
+            });
+            scene.input.keyboard.on('keydown-SPACE', ()=> { });
+
+            scene.input.keyboard.on('keyup-SPACE', ()=> { });
+
+
+        },
+
+        addAllFilesToPlayer: (_gameObject)=> {
+            let gameObject = _gameObject;
+            let files = gameObject.getData('files');
+            let folder = gameObject.getData('folder');
+            // GENERATE A CRC FOR THIS LIST AND ITS FOLDER
+            let lV = vars.localStorage;
+            let crcString = vars.localStorage.generateCRCString(folder,files);
+            let crc = crc32(crcString);
+
+            // CHECK IF THIS CRC IS ALREADY SAVED
+            let crcIsSaved = lV.playlists[crc] ? true : false;
+            let track = 1; let position = 0;
+            let date = new Date();
+            if (!crcIsSaved) { // It doesnt. Create the playlist and save it
+                lV.playlists[crc] = {
+                    folder: folder,
+                    tracks: files,
+                    currentTrack: track,
+                    currentTrackLength: 0, // when the track loads it will populate this field
+                    position: position,
+                    complete: false,
+                    dateCreated: date,
+                    dateLastAccessed: date
+                };
+                lV.savePlaylist();
+            } else { // this crc already exists, grab the info we need (current track and position)
+                vars.DEBUG && console.log(`💾 CRC already exists.\n  Loading the data`);
+                let pL = lV.playlists[crc];
+                pL.dateLastAccessed = date;
+                track = pL.currentTrack;
+                position = pL.position;
+                lV.updateSavedPlaylist();
+            };
+
+            // set the track and position (whether thats 1 and 0 or an actual file and position previously saved)
+            let player = vars.App.player; // grab the player
+            player.setCurrentTrack(track, position); // set the track and position
+            
+            vars.DEBUG && ( console.log(`Folder: ${folder}\nFiles:`), console.log(files) );
+            
+            // Send the playlist to the player
+            let playListVars = {
+                crc: crc,
+                tracks: files,
+                folder: folder
+            };
+            vars.App.player.updatePlayList(playListVars);
+
+            vars.UI.showPopup(false);
+        },
+
+        addFileToPlayer: (_file=null, _folder=null)=> {
+            if (!_file || !_folder) {
+                console.error(`File "${_file}" or folder "${_folder}" was invalid`);
+                return false;
+            };
+
+            let aP = vars.App.player;
+            aP.updatePlayListSingleFile(_folder, _file);
+        },
+
+        closeFileList: (_container)=> {
+            vars.containers.closeFileListContainer(_container);
+        },
+
+        enableDrag: (_object)=> {
+            scene.input.setDraggable(_object);
+            _object.isDragging=false;
+            return true;
+        },
+
+        folderClick: (_gameObject)=> {
+            let folderName = _gameObject.getData('folderName');
+            if (vars.App.foldersWithFileLists.includes(folderName)) return false; // is the folder contents already visible? if so, exit.
+
+            if (!_gameObject.getData('subFolder')) {
+                console.log(`Folder with the name "${folderName}" clicked.`);
+
+                new HTTPRequest('getFolder.php', { folderName: folderName });
+                return;
+            };
+
+            // if we get here we have a subfolder
+            let parentFolder = _gameObject.getData('parentFolder');
+            new HTTPRequest('getFolder.php', { folderName: `${parentFolder}/${folderName}` });
+        },
+
+        lockCursorSwitch: (_lock=true)=> {
+            let mouse = scene.input.mouse;
+            _lock ? mouse.requestPointerLock() : mouse.releasePointerLock();
+        },
+
+        rightClickSkip: (_gameObject)=> {
+            let gameObject = _gameObject;
+            let player = vars.App.player;
+            let container = player.container;
+            
+            let objects = { back: null, forward: null };
+            switch (gameObject.skip.value) {
+                case 10:
+                    objects = { forward: player.phaserObjects.forward1m, back: player.phaserObjects.back1m };
+                break;
+
+                case 60:
+                    objects = { forward: player.phaserObjects.forward5m, back: player.phaserObjects.back5m };
+
+                break;
+
+                case 300:
+                    objects = { forward: player.phaserObjects.forward10m, back: player.phaserObjects.back10m };
+
+                break;
+
+                case 600:
+                    objects = { forward: player.phaserObjects.forward10s, back: player.phaserObjects.back10s };
+                break;
+            };
+
+            if (objects.back && objects.forward) {
+                container.bringToTop(objects.back);
+                container.bringToTop(objects.forward);
+            };
+        }
+    },
+
+    phaserObjects: {},
+
+    plugins: {
+        add: (_gameObjects)=> {
+            if (!vars.webgl) return false;
+
+            if (!checkType(_gameObjects,'array')) _gameObjects = [_gameObjects];
+
+            if (!_gameObjects.length) return false;
+
+            _gameObjects.forEach((_gameObject)=> {
+                _gameObject.glow = scene.plugins.get('rexglowfilterpipelineplugin').add(_gameObject);
+            });
+        }
+    },
+
+    UI: {
+
+        init: ()=> {
+            vars.DEBUG ? console.log(`%cFN: ui > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
+
+            let UI = vars.UI;
+            
+            UI.initPopup();
+            UI.initRecentList();
+
+            let cC = consts.canvas;
+            scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<1 && 'b'}`).setDepth(999).setAlpha(0.2).setOrigin(1);
+        },
+
+        initPopup: ()=> {
+            let cC = consts.canvas;
+            let container = scene.containers.popup;
+
+            let bg = scene.add.image(cC.cX, cC.cY, 'whitepixel').setScale(cC.width, cC.height).setTint(0x0);
+
+            let fV = vars.fonts;
+            let font = { ...fV.default, ...fV.stroke, ...{fontSize: 48, align: 'center' } };
+            let popupText = vars.phaserObjects.popupText = scene.add.text(cC.cX, cC.cY, 'PRELOADING THE NEXT FILE\n\nPlease Wait', font).setOrigin(0.5);
+
+            container.add([bg,popupText]).setAlpha(0);
+        },
+
+        initRecentList: ()=> {
+            let cC = consts.canvas;
+            // container and its background
+            let container = scene.containers.recentList = scene.add.container().setName('recent').setDepth(consts.depths.recent)
+            let bg = scene.add.image(cC.cX,cC.cY,'whitepixel').setScale(cC.width,cC.height).setTint(0x0).setName('recentBG').setInteractive();
+            container.add(bg);
+
+            let y = cC.height*0.05;
+            // container contents
+            let fV = vars.fonts;
+            let font = fV.default;
+            // MAIN HEADING
+            let headingFont = { ...font, ... { fontSize: '48px'}};
+            let heading = scene.add.text(cC.cX, y, 'Recent Play Lists', headingFont).setOrigin(0.5).setTint(fV.colours.bright_1);
+            container.add(heading);
+
+            // HEADINGS
+            let headings = ['Book Title / Folder', 'Track', 'Position', 'Last Accessed'];
+            let xOffsets = [80,1630,1770,2470];
+            y+=80;
+            headings.forEach((_h,_i)=> {
+                let origin = _i<headings.length-1 ? 0 : 1;
+                let title = scene.add.text(xOffsets[_i], y, _h, font).setOrigin(origin,0);
+                _i===1 && (xOffsets[1] = title.x+title.width/2);
+                container.add(title);
+            });
+
+
+            let group = scene.groups.recentBooks = scene.add.group().setName('recentBooks');
+            y+=50;
+            let padding=15;
+            let recents = vars.localStorage.recentPlaylists;
+
+            container.alpha=0;
+
+            if (!recents.length) { return false; };
+
+            // we have a recents list
+            recents.forEach((_f)=> {
+                let folder = _f.folder;
+                let lastAccessedString = `${_f.d}d ${_f.h}h ${_f.m.toString().padStart(2,'0')}m ${_f.s.toString().padStart(2,'0')}s`;
+                let track = `${_f.currentTrack}/${_f.trackCount}`;
+                let position = _f.position;
+                let trackLengthInSeconds = _f.currentTrackLength;
+                if (trackLengthInSeconds) { // we have a valid track length, figure out the current position and redefine the position var to something nicer to read
+                    let cPos = convertSecondsToHMS(position*trackLengthInSeconds);
+                    let fPos = convertSecondsToHMS(trackLengthInSeconds);
+                    position = vars.App.generateTimeString(cPos,fPos);
+                };
+                checkType(position,'number') && (position=`${(position*10000|0)/100}%`);
+                _f.positionAsText = position;
+                vars.localStorage.playlists[_f.crc].positionAsText = _f.positionAsText; // add position as text to the playlist
+
+                // console.log(`${folder} was last accessed ${lastAccessedString}. Current track and position ${track} @ ${position}`);
+                let trackData = [folder, track, position, lastAccessedString];
+                let height = 0;
+                trackData.forEach((_d,_i)=> {
+                    let origin = _i===1 ? 0.5 : _i<headings.length-1 ? 0 : 1;
+                    let title = scene.add.text(xOffsets[_i], y, _d, font).setOrigin(origin,0).setTint(fV.colours.default);
+                    !height && (height=title.height);
+                    !_i && (title.setName('loadRecent').setInteractive(), title.folderData = { folder: folder, currentTrack: track, position: position, crc: _f.crc });
+                    container.add(title);
+                    group.add(title);
+                });
+                y+=height+padding;
+            });
+        },
+
+        showPopup: (_show=true, _msg='')=> {
+            if (_show && !_msg) {
+                console.warn(`No message was set!`);
+                return false;
+            };
+
+            vars.DEBUG && console.log(`${_show ? 'Showing' : 'Hiding'} popup`);
+
+            _show && vars.phaserObjects.popupText.setText(_msg);
+            vars.containers.fadeIn('popup',_show);
+        }
+    }
+};
