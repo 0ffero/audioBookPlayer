@@ -1,21 +1,37 @@
 <!--
     Audio Book Player by offer0, OCT 2022 (v1)
 
+    Created by offer0
+    If you copy this, please keep the index comment intact, thanks :)
+
     ***    REQUIREMENTS    ***
     A folder named AudioBooks in the main folder (where index.html is):
     If you dont want your audio book collection in the main folder,
-        you can add a folder link called AudioBooks instead (the way my home version is set up) - No vhosts needed!
+        you can add a folder link (*symlink) called AudioBooks instead
+        --- this is the way my home version is set up - No vhosts needed!
     Inside that folder is where you put each book folder.
     ie ./AudioBooks/[Book Name]
     eg ./AudioBooks/Aliens  --- inside which are 1) audio book files and/or 2) more (sub)folders
 
+    MediaInfo.exe CLI (if you want track info like comments,performer,release date etc)
+    If you do want to use mediainfo functionality copy mediainfo.exe (for windows) into the bin folder
+    MediaInfo available at https://mediaarea.net/en/MediaInfo/Download/Windows
+    Every other OS has a version available
+
     PHP is used to get the folder listings
+    Local Storage for playlists
     *** END OF REQUIREMENTS ***
 
     The audio book player was created using Phaser 3.55.2
     It currently runs at 2560x1440
-    V1.x+ will allow it to runs at half resolution as older iGPUs die under the stress
+    V1.x+ will allow it to run on older iGPUs as they die under the stress of webgl
+        It needs all tints to be removed as they dont work in canvas (but its real fast)
     The option is there to remove fade in and fade outs as theyre very intensive
+    Any Playlists generated are saved to local storage
+
+    *symlink
+        Windows: mklink /d "path\destination\symlink" "path\to\source"
+        OS-X/Linux: ln -s path/to/source path/destination/symlink
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -42,6 +58,7 @@
     <script src="js/classes/AudioPlayer.js"></script>
     <script src="js/classes/FileList.js"></script>
     <script src="js/classes/FolderList.js"></script>
+    <script src="js/classes/LongBar.js"></script>
     <script src="js/classes/ScreenSaver.js"></script>
 
     <!-- THE SCRIPT THAT STARTS EVERYTHING //-->

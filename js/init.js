@@ -1,5 +1,7 @@
 vars.DEBUG && console.log('Initialising...');
 
+// if the lS options doesnt exist - assume webgl, else load the value from lS
+if (!window.localStorage['ABP_options']) { vars.webgl = true; } else { vars.webgl = JSON.parse(window.localStorage['ABP_options']).webgl; };
 var config = {
     title: "Audio Book Player",
     type: vars.webgl ? Phaser.WEBGL : Phaser.CANVAS,
@@ -14,12 +16,6 @@ var config = {
     height: consts.canvas.height,
     width: consts.canvas.width,
 
-    /* Enabling this would require disabling the glow shader!
-    render: {
-        failIfMajorPerformanceCaveat: true
-    },
-    */
-
     fps: {
         min: 15,
         target: 60,
@@ -27,7 +23,6 @@ var config = {
     },
 
     scale: {
-        //autoRound: true, // should speed up the app... doesnt
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
         width: consts.canvas.width,

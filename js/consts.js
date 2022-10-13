@@ -18,18 +18,22 @@ const consts = {
     },
 
     depths: {
-        mainFolderList  : 10,
-        player          : 15,
-        fileList        : 20,
-        fileListOnTop   : 25,
-        recent          : 40,
-        screensaver     : 50,
-        popup           : 90
+        mainFolderList  :  10,
+        player          :  20,
+        fileList        :  30,
+        fileListOnTop   :  40,
+        recent          :  50,
+        screensaver     :  60,
+        longBar         :  70,
+        popup           :  80,
+        volume          : 100
     },
 
     fileExtensionRegEx: /\.m[p4][ab34]/,
-    flushToDiskTimeout: 10, // when a file is playing, the current time stamp is save every x seconds (in this case 10)
+    flushToDiskTimeout: 10, // when a file is playing, the current time stamp is saved every x seconds (in this case 10)
     foldersScrollScaler: 1, // <1 = faster, >1 = slower (0.5 = 2x as fast, 2 = half as fast etc)
+
+    longFileLength: 60*60, // default minimum file length (in seconds) before the long bar is generated
 
     mouse: {
         buttons: {

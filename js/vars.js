@@ -1,11 +1,16 @@
 "use strict"
 var vars = {
-    DEBUG: true,
+    DEBUG: false,
 
-    version: 0.92,
-    webgl: true, // note, you cant tint stuff when webgl is disabled
+    version: 0.994,
+    edition: 'Less Buggy Edition',
 
-    TODO: [],
+    webgl: true,
+
+    TODO: [
+        'player.updateMinfoDataToScreenSaver needs to update the screensaver data if minfo exists',
+        'When selecting a recent, it doesnt load the image'
+    ],
 
     animationsEnabled: true,
 
@@ -60,6 +65,8 @@ var vars = {
         images: {
             load: ()=> {
                 scene.load.image('whitepixel', 'images/whitepixel.png');
+                scene.load.image('blackpixel', 'images/blackpixel.png'); // needed for non webgl version
+                scene.load.image('positionBarPixel', 'images/positionBarPixel.png'); // needed for non webgl version
                 // PLAYER
                 scene.load.atlas('player', 'images/player.png', 'images/player.json');
                 // SCREEN SAVER
@@ -183,7 +190,7 @@ var vars = {
         /*  REAL EXAMPLE
             playlists[574397742789] = 
             {
-                folder: 'Stephen King/1408/',
+                folder: 'Aliens',
                 tracks: [
                     '01 - Intro.mp4',
                     '02 - Chapter 1.mp4',
@@ -194,7 +201,9 @@ var vars = {
                 ],
                 currentTrack: 0, // '18 - Chapter 19.mp4',
                 currentTrackLength: 283412, // length in seconds
+                images: [], // initially null
                 position: 0.8041,
+                positionAsText: '08:05 / 10:06',
                 complete: false,
                 dateCreated: Date(Mon Oct 03 2022 10:03:54 GMT+0100 (British Summer Time))
                 dateLastAccessed: Date(Mon Oct 03 2022 22:03:54 GMT+0100 (British Summer Time)),
@@ -210,8 +219,12 @@ var vars = {
 
             !lS[pre + 'playlists'] && (lS[pre + 'playlists'] = '{}');
             lV.playlists = JSON.parse(lS[pre + 'playlists']);
-
             JSON.stringify(lV.playlists)!=='{}' && lV.generateRecentList();
+
+
+            !lS[pre + 'options'] && (lS[pre + 'options'] = JSON.stringify({ skipAmount: 10, volume: 0.4, webgl: true }));
+            lV.options = JSON.parse(lS[pre + 'options']);
+            vars.App.lowSpecCheck();
 
         },
 
@@ -240,6 +253,14 @@ var vars = {
             };
 
             lV.recentPlaylists = arraySortByKey(orderedList,'time');
+        },
+
+        saveOptions: ()=> {
+            let lS = window.localStorage;
+            let lV = vars.localStorage;
+            let pre = lV.pre;
+
+            lS[pre + 'options'] = JSON.stringify(lV.options);
         },
 
         savePlaylist: ()=> {
@@ -275,6 +296,7 @@ var vars = {
         fileLists: {
             
         },
+        longBar: null, // populated if the book is greater than 90m
 
         player: null,
 
@@ -284,8 +306,27 @@ var vars = {
             new HTTPRequest('getFolder.php'); // these requests are self contianed, so we dont have to set them to a variable
 
             let App = vars.App;
-            App.player = new AudioPlayer({ x: 0, y: 0, containerX: 1900, containerY: 20 } ); // create the audio player
+            App.player = new AudioPlayer({ x: 0, y: 0, containerX: 1940, containerY: 20 } ); // create the audio player
             App.screenSaver = new ScreenSaver(); // create the screen saver
+        },
+
+        destroyLongBar: ()=> {
+            let App = vars.App;
+            if (App.longBar) {
+                // a long bar exists, destroy it
+                App.longBar.destroy();
+                App.longBar = null;
+            };
+        },
+
+        // used when files are longer than 90 minutes
+        generateLongBar: (_totalTimeInSeconds=0)=> {
+            if (!_totalTimeInSeconds) return false;
+            vars.DEBUG && console.log(`Generating Long Bar for this file`);
+            let App = vars.App;
+            App.destroyLongBar();
+
+            App.longBar = new LongBar({totalTimeInSeconds: _totalTimeInSeconds});
         },
 
         generateSafeFolderName: (_folderName)=> {
@@ -305,9 +346,39 @@ var vars = {
             position+=`${fPos.m.toString().padStart(2,'0')}:${fPos.s.toString().padStart(2,'0')}`;
 
             return position;
+        },
+
+        getMoreInfoDataFor: (_folder=null, _crc=null)=> {
+            if (!_folder || !_crc) return false;
+
+            new HTTPRequest('getMinfo.php', { folderName: _folder, crc: _crc });
+        },
+
+        getStateIconForFolder: (_folderName)=> {
+            let _f = _folderName;
+            let entry = Object.entries(vars.localStorage.playlists).find(m=>m[1].folder===_f || m[1].folder.includes(_f));
+            
+            let texture;
+            if (entry && entry.length===2) {
+                texture = Object.entries(vars.localStorage.playlists).find(m=> m[1].folder!==_f && m[1].folder.includes(_f)) ? 'subFolderAccessed' : entry[1].complete ? 'complete' : 'incomplete';
+            } else {
+                texture = 'neverAccessed';
+            };
+
+            return texture;
+        },
+
+        lowSpecCheck: ()=> {
+            let lV = vars.localStorage;
+            if (!lV.options.webgl) return; // webgl is already disabled, which means the low spec test has already been done and was confirmed
+            let lowSpecs = ['android','iPhone','kindle','windowsPhone'];
+            let lowSpec=false;
+            let os = game.device.os;
+            lowSpecs.forEach((_ls)=> { if (os[_ls] && !lowSpec) { lowSpec=true; }; });
+
+            // if low spec machine was found: set webgl to false, save the options and reload
+            if (lowSpec) { lV.options.webgl=false; lV.saveOptions(); window.location.reload(); };
         }
-
-
     },
 
     // GAME/APP
@@ -324,7 +395,7 @@ var vars = {
         init: ()=> {
             vars.DEBUG ? console.log(`%cFN: audio > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
 
-            scene.sound.volume = vars.DEBUG ? 0.1 : 0.4;// keep it nice and quiet while debuging
+            scene.sound.volume = vars.localStorage.options.volume||0.4;// keep it nice and quiet while debuging
         },
 
         changeVolume: (_increase=true)=> {
@@ -333,7 +404,10 @@ var vars = {
                 case false: scene.sound.volume=clamp(((scene.sound.volume*10)-1)/10,0,1); break;
             };
 
-            console.log(`🔉 New volume ${scene.sound.volume}`);
+            vars.UI.updateVolumePosition();
+            let lV = vars.localStorage;
+            lV.options.volume=scene.sound.volume;
+            lV.saveOptions();
         },
 
         playSound: (_key)=> {
@@ -380,9 +454,11 @@ var vars = {
 
             // phaser objects
             scene.input.on('gameobjectdown', function (pointer, gameObject) {
+                if (gameObject.alpha!==1) return false;
+
                 let name = gameObject.name;
 
-                let ignoreList = ['fileListContainer','folderListContainer','scrollBar','scrollBarPlayer'];
+                let ignoreList = ['fileListContainer','folderListContainer','scrollBar','scrollBarPlayer','popupBG','longBarPointer'];
                 if (ignoreList.includes(name)) {
                     if (name==='folderListContainer') { vars.input.lockCursorSwitch(); return false; };
                     if (pointer.button===mouseButtons.RIGHT) {
@@ -412,8 +488,6 @@ var vars = {
                     return;
                 };
                 if (name === 'addAll') {
-                    // TODO -   THIS WILL EVENTUALLY BE MOVE
-                    //          INTO ITS OWN FUNCTION CALLED addAllFilesToPlayer
                     vars.UI.showPopup(true, 'Adding all files to player\n\nPlease Wait.');
 
                     scene.tweens.addCounter({
@@ -442,6 +516,8 @@ var vars = {
                     let player = vars.App.player;
                     player.emptyGroup();
                     player.stopAndDestroyCurrentTrack();
+                    player.resetVars();
+                    player.container.hide(); // hide the player
                     return true;
                 };
                 if (name==='info') { // only shows the screen saver (book over view) if a track is playing
@@ -498,9 +574,15 @@ var vars = {
                     let crc = fD.crc;
                     let files = vars.localStorage.playlists[crc].tracks;
                     let folder = fD.folder;
-                    gameObject.setData({ files: files, folder: folder, crc: crc });
+                    // fade out the recents list
                     vars.containers.fadeIn('recentList',false);
+                    // if the folder is already loaded, dont reload it
+                    if (folder===vars.App.player.folder) return false;
+
+                    gameObject.setData({ files: files, folder: folder, crc: crc });
                     vars.input.addAllFilesToPlayer(gameObject);
+                    // as this skips the file list pop up we need to get the images from the playlist
+                    new HTTPRequest('getBookImagesForFolder.php', { folderName: folder});
                     return;
                 };
                 if (name==='recentBG') {
@@ -526,6 +608,7 @@ var vars = {
             });
             scene.input.on('gameobjectup', function (pointer, gameObject) {
                 let name = gameObject.name;
+
                 if (name==='folderListContainer') {
                     vars.input.lockCursorSwitch(false);
                 };
@@ -534,7 +617,20 @@ var vars = {
             scene.input.on('gameobjectover', function (pointer, gameObject) {
                 let name = gameObject.name;
                 if (name.startsWith('folder_')) {
-                    gameObject.setTint(vars.fonts.colours.white);
+                    vars.webgl ? gameObject.setTint(vars.fonts.colours.white) : gameObject.setAlpha(1);
+                };
+
+                if (name.startsWith('player_track_')) {
+                    !vars.webgl && gameObject.setAlpha(1);
+                };
+
+                if (name==='longFileBar') {
+                    let lB = vars.App.longBar;
+                    // make sure the container has full alpha
+                    if (lB.container.alpha===0.2) {
+                        lB.container.tweens.fadeIn.play();
+                    };
+                    vars.App.longBar.disableFadeOut();
                 };
                 // GLOWS ON
                 if (vars.webgl && gameObject.glow) { let glow = name==='trackPositionPointer' ? 0.02 : 0.005; gameObject.glow.setIntensity(glow); return; };
@@ -543,7 +639,15 @@ var vars = {
             scene.input.on('gameobjectout', function (pointer, gameObject) {
                 let name = gameObject.name;
                 if (name.startsWith('folder_')) {
-                    gameObject.setTint(vars.fonts.colours.bright_1);
+                    vars.webgl ? gameObject.setTint(vars.fonts.colours.bright_1) : gameObject.setAlpha(0.5);
+                };
+
+                if (name.startsWith('player_track_')) {
+                    !vars.webgl && gameObject.setAlpha(gameObject.selected ? 1: 0.5);
+                };
+
+                if (name==='longFileBar') {
+                    vars.App.longBar.startFadeOutDelay();
                 };
                 // GLOWS OFF
                 if (gameObject.glow) { gameObject.glow.setIntensity(0); return; };
@@ -556,19 +660,18 @@ var vars = {
 
                 let oName = gameObject.name;
 
-                if (oName.startsWith('scrollBar')) return false;
+                if (oName.startsWith('scrollBar') || oName==='longBarPointer') return false;
 
                 switch (oName) {
                     case 'fileListContainer': case 'folderListContainer':
+                        oName==='folderListContainer' && vars.App.folderList.disableClicks();
                         gameObject.isDragging=true;
                         vars.containers.bringFileListToTop(gameObject);
                         game.canvas.style.cursor='grabbing';
                     break;
 
-                    case 'volumeSlider': break; // ignore the drag start for this object
-
                     default:
-                        console.error(`DRAG END for ${oName} not found!`);
+                        console.error(`DRAG START for ${oName} not found!`);
                         debugger;
                     break;
                 };
@@ -580,12 +683,15 @@ var vars = {
                     case 'fileListContainer':
                         //dragX < gameObject.minX ? dragX=gameObject.minX : dragX > gameObject.maxX ? dragX=gameObject.maxX : dragX;
                         gameObject.setPosition(dragX,dragY);
+                        return true;
                     break;
 
-                    case 'folderListContainer':
-                        /*dragY < gameObject.maxY && (dragY=gameObject.maxY);
-                        dragY > 0 && (dragY=0);
-                        gameObject.y=dragY;*/
+                    case 'longBarPointer':
+                        dragX > gameObject.maxX && (dragX=gameObject.maxX);
+                        dragX < 0 && (dragX=0);
+                        gameObject.x=dragX;
+                        vars.App.longBar.updateSetToTime();
+                        return true;
                     break;
 
                     case 'scrollBar':
@@ -608,8 +714,7 @@ var vars = {
                     break;
 
                     default:
-                        console.error(`DRAG for ${oName} not found!`);
-                        debugger;
+                        vars.DEBUG && console.error(`DRAG for ${oName} not found!`);
                     break;
                 };
             });
@@ -619,8 +724,13 @@ var vars = {
 
                 switch (oName) {
                     case 'fileListContainer': case 'folderListContainer':
+                        oName==='folderListContainer' && vars.App.folderList.disableClicks(false);
                         gameObject.isDragging = false;
                         game.canvas.style.cursor='default';
+                    break;
+
+                    case 'longBarPointer':
+                        vars.App.longBar.setPlayerSeek();
                     break;
                 }
             });
@@ -692,8 +802,10 @@ var vars = {
                 lV.updateSavedPlaylist();
             };
 
-            // set the track and position (whether thats 1 and 0 or an actual file and position previously saved)
             let player = vars.App.player; // grab the player
+            player.container.show(); // show it
+
+            // set the track and position (whether thats 1 and 0 or an actual file and position previously saved)
             player.setCurrentTrack(track, position); // set the track and position
             
             vars.DEBUG && ( console.log(`Folder: ${folder}\nFiles:`), console.log(files) );
@@ -704,12 +816,15 @@ var vars = {
                 tracks: files,
                 folder: folder
             };
-            vars.App.player.updatePlayList(playListVars);
+            player.importPlayList(playListVars);
 
+            // Hide the pop up
             vars.UI.showPopup(false);
         },
 
         addFileToPlayer: (_file=null, _folder=null)=> {
+            // single files can no longer be sent to the player
+            return false;
             if (!_file || !_folder) {
                 console.error(`File "${_file}" or folder "${_folder}" was invalid`);
                 return false;
@@ -756,30 +871,39 @@ var vars = {
             let container = player.container;
             
             let objects = { back: null, forward: null };
+            let skipInSeconds;
             switch (gameObject.skip.value) {
                 case 10:
                     objects = { forward: player.phaserObjects.forward1m, back: player.phaserObjects.back1m };
+                    skipInSeconds=60;
                 break;
 
                 case 60:
                     objects = { forward: player.phaserObjects.forward5m, back: player.phaserObjects.back5m };
-
+                    skipInSeconds=300;
                 break;
 
                 case 300:
                     objects = { forward: player.phaserObjects.forward10m, back: player.phaserObjects.back10m };
-
+                    skipInSeconds=600;
                 break;
 
                 case 600:
                     objects = { forward: player.phaserObjects.forward10s, back: player.phaserObjects.back10s };
+                    skipInSeconds=10;
                 break;
             };
 
+            // UPDATE the UI
             if (objects.back && objects.forward) {
                 container.bringToTop(objects.back);
                 container.bringToTop(objects.forward);
             };
+
+            // SAVE the new skip val
+            let lV = vars.localStorage;
+            lV.options.skipAmount=skipInSeconds;
+            lV.saveOptions();
         }
     },
 
@@ -808,16 +932,35 @@ var vars = {
             
             UI.initPopup();
             UI.initRecentList();
+            UI.initVolumePopup();
 
             let cC = consts.canvas;
-            scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<1 && 'b'}`).setDepth(999).setAlpha(0.2).setOrigin(1);
+            let history = vars.phaserObjects.history = scene.add.image(cC.width-20, cC.height-60 , 'ui', 'historyImage').setOrigin(1).setName('recentButton').setInteractive();
+            let hide = scene.add.tween({
+                targets: history,
+                alpha: 0,
+                duration: 500,
+                paused: true,
+            });
+            let show = scene.add.tween({
+                targets: history,
+                alpha: 1,
+                duration: 500,
+                paused: true,
+            });
+            history.tweens = { hide: hide, show: show };
+            let vText = scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<1 ? 'β': ''} (${vars.edition})`,vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
+            let seconds = 1000;
+            let delay = 30*seconds;
+            vText.tween = scene.add.tween({ targets: vText, delay: delay, duration: 1000, alpha: 0.8, yoyo: true, loop: true});
         },
 
         initPopup: ()=> {
             let cC = consts.canvas;
             let container = scene.containers.popup;
 
-            let bg = scene.add.image(cC.cX, cC.cY, 'whitepixel').setScale(cC.width, cC.height).setTint(0x0);
+            let bg = vars.UI.generateBackground();
+            bg.setName('popupBG').setInteractive();
 
             let fV = vars.fonts;
             let font = { ...fV.default, ...fV.stroke, ...{fontSize: 48, align: 'center' } };
@@ -830,7 +973,8 @@ var vars = {
             let cC = consts.canvas;
             // container and its background
             let container = scene.containers.recentList = scene.add.container().setName('recent').setDepth(consts.depths.recent)
-            let bg = scene.add.image(cC.cX,cC.cY,'whitepixel').setScale(cC.width,cC.height).setTint(0x0).setName('recentBG').setInteractive();
+            let bg = vars.UI.generateBackground();
+            bg.setName('recentBG').setInteractive();
             container.add(bg);
 
             let y = cC.height*0.05;
@@ -894,6 +1038,33 @@ var vars = {
             });
         },
 
+        initVolumePopup() {
+            let cC = consts.canvas;
+            let container = scene.containers.volume = scene.add.container().setName('volume').setDepth(consts.depths.volume);
+            let volume = vars.phaserObjects.volumeImage = scene.add.image(cC.cX,cC.cY,'ui','volumeImage');
+            let bL = volume.getBottomLeft();
+            volume.minX = bL.x+2;
+            let volumePosition = vars.phaserObjects.volumePosition = scene.add.image(volume.minX, bL.y-2, 'whitepixel').setScale(45,26).setOrigin(0,1);
+            volume.maxX = volume.minX+volume.width-2 - volumePosition.displayWidth;
+            volume.delta = volume.maxX - volume.minX;
+            container.add([volume,volumePosition]).setAlpha(0);
+            container.tween = scene.tweens.add({
+                targets: container,
+                alpha: 0,
+                delay: 2000,
+                duration: 500
+            });
+        },
+
+        generateBackground: ()=> {
+            let cC = consts.canvas;
+            let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
+            let bg = scene.add.image(cC.cX, cC.cY, texture).setScale(cC.width, cC.height);
+            vars.webgl && bg.setTint(0x0);
+
+            return bg;
+        },
+
         showPopup: (_show=true, _msg='')=> {
             if (_show && !_msg) {
                 console.warn(`No message was set!`);
@@ -904,6 +1075,23 @@ var vars = {
 
             _show && vars.phaserObjects.popupText.setText(_msg);
             vars.containers.fadeIn('popup',_show);
+        },
+
+        updateVolumePosition: ()=> {
+            let container = scene.containers.volume;
+            if (container.tween.isPlaying()) {
+                container.tween.restart();
+            } else {
+                container.tween.play();
+            };
+            container.alpha=1;
+            let volume = scene.sound.volume;
+            let pO = vars.phaserObjects;
+            let volumeBG = pO.volumeImage;
+            let minX = volumeBG.minX;
+            let delta = volumeBG.delta;
+            let newX = delta*volume+minX;
+            pO.volumePosition.x = newX;
         }
     }
 };

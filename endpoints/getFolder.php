@@ -1,7 +1,6 @@
 <?php
 include('jsonHeaders.php');
 
-
 $mainFolder = 'D:\\__NOTFILMS\\__AUDIO BOOKS';
 
 $isSubFolder = false; // assume non sub folder initially

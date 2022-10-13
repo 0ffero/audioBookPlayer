@@ -14,9 +14,12 @@ let AudioPlayer = class {
     preInits(_defaults) {
         // we now always generate the container
         this.container = scene.add.container().setName('audioPlayer').setDepth(consts.depths.player);
-        let containerX = _defaults.containerX ? _defaults.containerX : 0;
-        let containerY = _defaults.containerY ? _defaults.containerY : 0;
-        this.container.setPosition(containerX,containerY);
+        let containerX = _defaults.containerX||0;
+        let containerY = _defaults.containerY||0;
+        this.container.setPosition(consts.canvas.width+20,containerY);
+        this.container.startX = containerX;
+
+        this.addAnimationsToContainer();
 
         // add the group that holds the track list
         this.trackListGroup = scene.add.group().setName('trackList');
@@ -37,13 +40,18 @@ let AudioPlayer = class {
 
         this.playing = false;
 
+        this.firstTrack=true;
+
         let frames = 60;
         let seconds = 1;
         this.updatePlaylistTimeout = this.updatePlaylistTimeoutMax = seconds * frames;
         this.flushToLocalStorageTimeout = this.flushToLocalStorageTimeoutMax=consts.flushToDiskTimeout; // this is how many times the local playlist is updated before its flushed to disk (localStorage). The reason for the timeout is in case theres a lot of data to be sent to lS
         this.phaserObjects = {};
 
-        this.screenSaverTimeout = this.screenSaverTimeoutMax = 10 * frames;
+        this.moreInfo = null;
+        this.minfoPassedToScreenSaver = false;
+
+        this.screenSaverTimeout = this.screenSaverTimeoutMax = 10*frames;
 
         this.initUI();
     }
@@ -80,9 +88,9 @@ let AudioPlayer = class {
         // INTERACTIBLES
         let xOffset = 100;
         // PLAY AND PAUSE BUTTONS
-        let playingButton       = this.phaserObjects.playingButton  = scene.add.image(this.centreX, y, texture, 'playing').setName('play').setInteractive();
+        let playingButton = this.phaserObjects.playingButton  = scene.add.image(this.centreX, y, texture, 'playing').setName('play').setInteractive();
         vars.plugins.add(playingButton);
-        let pausedButton        = this.phaserObjects.pausedButton   = scene.add.image(this.centreX, y, texture, 'paused').setName('pause').setInteractive();
+        let pausedButton = this.phaserObjects.pausedButton   = scene.add.image(this.centreX, y, texture, 'paused').setName('pause').setInteractive();
         vars.plugins.add(pausedButton);
 
         // SKIP THROUGH TRACK BUTTONS
@@ -141,19 +149,19 @@ let AudioPlayer = class {
         let bR = playlistBG.getBottomRight();
         this.binIcon = scene.add.image(bR.x, bR.y+40, texture, 'binIcon').setOrigin(1,0).setName('binAllFiles').setAlpha(0.2).setInteractive();
         vars.plugins.add(this.binIcon);
-        let sPLI = this.savePlaylistIcon = scene.add.image(bR.x-80, bR.y+48, texture, 'savePlaylistIcon').setOrigin(1,0).setName('savePlaylist').setInteractive();
+        let savePlaylist = this.savePlaylistIcon = scene.add.image(bR.x-240, bR.y+48, texture, 'savePlaylistIcon').setOrigin(1,0).setName('savePlaylist').setInteractive();
         this.savePlaylistIcon.tween = scene.tweens.add({
-            targets: sPLI,
+            targets: savePlaylist,
             alpha: 0.5,
-            onUpdate: ()=> { sPLI.frame.name!=='savingIcon' && sPLI.setFrame('savingIcon'); },
-            onComplete: ()=> { sPLI.setFrame('savePlaylistIcon') },
+            onUpdate: ()=> { savePlaylist.frame.name!=='savingIcon' && savePlaylist.setFrame('savingIcon'); },
+            onComplete: ()=> { savePlaylist.setFrame('savePlaylistIcon') },
             duration: 125, yoyo: true, repeat: 2,
         });
 
         let recentFiles = this.phaserObjects.recentFiles = scene.add.image(bR.x-160, bR.y+48, texture, 'historyIcon').setOrigin(1,0).setName('recentButton').setInteractive();
         !vars.localStorage.recentPlaylists.length && recentFiles.setAlpha(0.2);
         
-        let infoButton = this.phaserObjects.infoButton = scene.add.image(bR.x-240, bR.y+48, texture, 'infoIcon').setOrigin(1,0).setName('info').setAlpha(0.2).setInteractive();
+        let infoButton = this.phaserObjects.infoButton = scene.add.image(bR.x-80, bR.y+48, texture, 'infoIcon').setOrigin(1,0).setName('info').setAlpha(0.2).setInteractive();
 
 
         // ADD EVERYTHING TO THE CONTAINER
@@ -161,6 +169,7 @@ let AudioPlayer = class {
         this.addAllToContainer([upperSectionBG, playlistBG, headerText, trackIntText, trackTitleText, pausedButton, playingButton, previousButton, nextButton, trackPositionBar, trackPosition, this.binIcon, this.savePlaylistIcon, recentFiles, infoButton]);
         // THE BACK AND FORWARD BUTTONS
         this.addAllToContainer([back10m,back5m,back1m,back10s,forward10m,forward5m,forward1m,forward10s]);
+        this.skipsBringToTop();
 
 
         // ADD THE SCROLL BAR
@@ -174,9 +183,92 @@ let AudioPlayer = class {
         let is_object = checkType(_objects, 'object');
         if (!is_array || !is_object) return false;
 
-        vars.DEBUG && console.log(`Adding an ${ is_array ? 'array of objects' : 'object'} to the Audio Player container`);
+        vars.DEBUG && console.log(`Adding an ${ is_array ? `array of ${_objects.length} objects` : 'object'} to the Audio Player container`);
         this.container.add(_objects);
         return true;
+    }
+
+    addAnimationsToContainer() {
+        let c = this.container;
+        let cC = consts.canvas;
+        let showTween = scene.add.tween({
+            targets: c,
+            x: c.startX,
+            duration: 1000,
+            ease: 'Quad.easeOut',
+            paused: true
+        });
+
+        let hideTween = scene.add.tween({
+            targets: c,
+            x: cC.width+20,
+            duration: 1000,
+            ease: 'Quad.easeIn',
+            onComplete: ()=> { vars.phaserObjects.history.tweens.show.play(); },
+            paused: true
+        });
+
+        c.tweens = {
+            show: showTween,
+            hide: hideTween
+        };
+
+        
+        c.hide = ()=> {
+            c.onScreen = false;
+            vars.animationsEnabled ? c.tweens.hide.play() : (c.x=cC.width+20, vars.phaserObjects.history.alpha=1 );
+        };
+        c.show = ()=> {
+            c.onScreen = true;
+            if (vars.animationsEnabled) {
+                vars.phaserObjects.history.tweens.hide.play();
+                c.tweens.show.play();
+            } else {
+                c.x = c.startX;
+                vars.phaserObjects.history.alpha=0;
+            };
+        };
+
+        c.onScreen=false;
+        
+    }
+
+    // This gets called if more info was found in the cache folder
+    // either by the initial http request when passing a file list
+    // to the player or by the track changing
+    // it pushes the current tracks saved data to the screen saver
+    addMinfoDataToScreenSaver() {
+        if (!this.moreInfo || !this.currentTrackInt) return false;
+        
+        if (this.minfoPassedToScreenSaver) return;
+        this.minfoPassedToScreenSaver=true;
+
+        let minfo = this.moreInfo;
+        let trackName = this.playlist[this.currentTrackInt-1];
+
+        let fileData = minfo[trackName];
+        let general = fileData.General;
+        let audio = fileData.Audio;
+        
+        // GENERAL
+        let performer = general.Performer===general['Album/Performer'] ? !general.Performer ? '' : `Performer: ${general.Performer}` : general.Performer ? `Performer: ${general.Performer} (${general['Album/Performer']})` : `Performer: ${general['Album/Performer']} (${general.Performer})`;
+        let bookName = general.Album;
+        let releaseDate = general.Released_Date; // usually empty
+        let releaseDateOriginal = general['Original/Released_Date'];
+        let released = `Release Date: ${releaseDateOriginal} ${releaseDate && `(${releaseDate})`}`;
+        let recordedDate = `Recorded: ${general.Recorded_Date}`;
+        let trackRealName = general.Track;
+        let comment = `Synopsis:\n${general.Comment}`;
+        let duration = `Duration: ${general.Duration}`;
+        
+        // AUDIO
+        let channels = audio['Channel(s)']|0;
+        channels = channels===1 ? 'MONO' : channels===2 ? 'STEREO' : 'SURROUND';
+        let bitrate = `Bit Rate: ${audio.BitRate}`;
+        let sampleRate = 'Sample Rate: ' + audio.SamplingRate/1000 + 'KHz';
+        
+        let texts = { bookName: bookName, trackName: trackRealName, performer: performer, duration: duration, released: released, recorded: recordedDate, synopsis: comment, channels: channels, bitrate: bitrate, samplerate: sampleRate };
+        vars.App.screenSaver.addFileData(texts);
     }
 
     addScrollBar() {
@@ -194,7 +286,8 @@ let AudioPlayer = class {
         let percent = 1;
 
         let height = percent*availableHeight;
-        let scrollBar = this.phaserObjects.scrollBar = scene.add.image(x,y,'whitepixel').setTint(0x999999).setOrigin(1,0).setScale(width,height).setName('scrollBarPlayer').setInteractive();
+        let scrollBar = this.phaserObjects.scrollBar = scene.add.image(x,y,'whitepixel').setOrigin(1,0).setScale(width,height).setName('scrollBarPlayer').setInteractive();
+        vars.webgl ? scrollBar.setTint(0x999999) : scrollBar.setAlpha(0.75);
         scrollBar.minY = scrollBar.y;
         scrollBar.maxY = scrollBar.y + availableHeight;
         scrollBar.maxHeight = scrollBar.displayHeight;
@@ -204,6 +297,24 @@ let AudioPlayer = class {
 
         this.showScrollBar(false);
 
+    }
+
+    albumComplete() {
+        vars.DEBUG && console.log(`%cSetting this playlist to complete`,'color: #26ac13');
+        this.track && this.track.destroy(); // the track might have auto destroyed by now, this is in case it hasnt
+        this.playing=false;
+        // update the playlist to completed
+        let lV = vars.localStorage;
+        let pLs = lV.playlists;
+        let pL = pLs[this.crcForPlaylist];
+        pL.complete = true;
+        pL.completionDate = new Date();
+        pL.position = 0;
+        pL.currentTrack = 1;
+        pL.positionAsText = '';
+
+        lV.updateSavedPlaylist();
+        return true;
     }
 
     cropObject(_object=null) {
@@ -252,14 +363,18 @@ let AudioPlayer = class {
         let trackTextObjects = [];
         this.playlist.forEach((_entry,_i)=> {
             let vis = _i<this.maxFilesPerPage ? true : false;
-            let trackIntText = scene.add.text(x, y, currentTrackInt.toString().padStart(padStart,'0'), font).setTint(colours.default).setVisible(vis); // origin for text objects are always 0 (not 0.5)
+            let trackIntText = scene.add.text(x, y, currentTrackInt.toString().padStart(padStart,'0'), font).setVisible(vis); // origin for text objects are always 0 (not 0.5)
+            vars.webgl ? trackIntText.setTint(colours.default) : trackIntText.setAlpha(0.25);
             trackIntText.fLPos=fLPos;
             !height && ( height = trackIntText.height );
 
-            let tint = currentTrackInt===this.currentTrackInt ? colours.white : colours.default;
+            let isCurrentTrack = currentTrackInt===this.currentTrackInt ? true : false;
+            let tint = isCurrentTrack ? colours.white : colours.default;
             
             let entrySansExt = _entry.replace(consts.fileExtensionRegEx,'');
-            let trackText = scene.add.text(x+intPadding, y, entrySansExt, font).setTint(tint).setVisible(vis).setName(`player_track_${_i}`).setInteractive();
+            let trackText = scene.add.text(x+intPadding, y, entrySansExt, font).setVisible(vis).setName(`player_track_${_i}`).setInteractive();
+            trackText.selected = isCurrentTrack;
+            vars.webgl ? trackText.setTint(tint) : trackText.setAlpha(isCurrentTrack ? 1: 0.5);
             this.cropObject(trackText);
             trackText.fLPos=fLPos;
             trackTextObjects.push(trackIntText, trackText);
@@ -287,11 +402,11 @@ let AudioPlayer = class {
         this.sortPlaylistObjects();
     }
 
-    emptyGroup() {
+    emptyGroup(_hideBin=true) {
         // destroy everything in the tracklist group
         vars.DEBUG && console.log(`🚽 Emptying the current play list`);
         this.trackListGroup.clear(true,true);
-        this.binIcon.setAlpha(0.2);
+        _hideBin && this.binIcon.setAlpha(0.2);
         this.showScrollBar(false);
     }
 
@@ -327,6 +442,79 @@ let AudioPlayer = class {
         // LOAD the track
         this.loadTrack();
     }
+
+    
+    
+    
+    // THE MAIN FUNCTION, CALLED EXTERNALLY. SETS THE PLAYLIST
+    importPlayList(_playlist) { // sending just a playlist will empty the current one. if the new tracks are to be added to the current list, set _empty to false when calling
+        // is this the same playlist (crc) as the one currently loaded into the player?
+        if (this.crcForPlaylist && this.crcForPlaylist===_playlist.crc) return false;
+        
+        // NEW PLAYLIST WAS SENT
+        this.firstTrack=true; // reset first track to true
+        // check that the playlist has files in it
+        if (!_playlist.tracks.length) {
+            let error = 'No tracks in the playlist!';
+            this.errors.splice(0,0,error);
+            vars.DEBUG && console.warn(error);
+            return error;
+        };
+        // Before this function is called the playlist is checked for a
+        // saved "continue from" point. if it doesnt exist set the defaults
+        !this.currentTrackInt && this.setCurrentTrack(); // initialise the current track if it hasnt been set yet
+
+        this.binIcon.setAlpha(1);
+
+        this.emptyPlaylist(); // empty out the playlist (if it exists)
+
+        // TODO: We can probably just set the new playlist, as they cant be joined any more
+        this.playlist = _playlist.tracks; // add the new playlist
+
+        // this.FOLDER MUST ALWAYS BE SET NOW. ILL KEEP THE TEST THOUGH TO TEST THAT IT DOES EXIST
+        let folder = this.folder = _playlist.folder ? _playlist.folder : null; // was a folder passed (always the case now)
+        if (!folder) {
+            let msg = `The folder can no longer be empty!`;
+            this.errors.splice(0,0,msg);
+            console.error(msg);
+            return msg;
+        };
+
+        // set the internal crc to link back to the playlist
+        let crc = this.crcForPlaylist = _playlist.crc;
+        // now, with that info we can set the current track and position
+        let lV = vars.localStorage;
+        let pL = lV.playlists[this.crcForPlaylist];
+        this.currentTrackInt = pL.currentTrack;
+        let trackName = _playlist.tracks[this.currentTrackInt-1];
+        this.currentTrackTime = pL.position;
+
+        let pAT = this.positionAsText = pL.positionAsText ? pL.positionAsText : null;
+        
+        // update the position of the track bar
+        this.setTrackPosition();
+
+        // SCREEN SAVER UI UPDATE
+        // Initially we set the screen saver data based on what was saved in the playlist
+        // Most of this info will be overwritten if minfo is available
+        if (vars.App.screenSaver) {
+            let sS = vars.App.screenSaver;
+            sS.changeFolder(folder);
+            sS.changeTrackNameText(trackName);
+            sS.changeCurrentTrackIntAndTime(this.currentTrackInt, pAT);
+            sS.updateTimeBar(this.currentTrackTime);
+        };
+
+        // REDRAW THE PLAYLIST
+        this.playlist.length && this.drawPlaylist(folder);
+
+        // now that the player has been initialised with the default data
+        // check if theres minfo for the album
+        vars.App.getMoreInfoDataFor(folder,crc);
+    }
+
+
+
 
     loadTrack() {
         let currentTrackName = this.playlist[this.currentTrackInt-1];
@@ -437,7 +625,7 @@ let AudioPlayer = class {
 
 
     redrawPlaylist() {
-        this.emptyGroup();
+        this.emptyGroup(false);
         this.drawPlaylist();
     }
 
@@ -456,12 +644,22 @@ let AudioPlayer = class {
 
         if (!this.screenSaverTimeout) {
             // Unlike most timeouts, we dont reset this one. Its only reset after the user closes the screensaver
-            vars.containers.fadeIn('screenSaver');
+            vars.containers.fadeIn('screenSaver',true,1);
         };
     }
 
     resetScreenSaverTimeout() {
         this.screenSaverTimeout = this.screenSaverTimeoutMax;
+    }
+
+    resetVars() {
+        this.crcForPlaylist=null
+        this.currentTrackInt=0;
+        this.folder='';
+        this.moreInfo = null;
+        this.playlist = null;
+        this.positionAsText=null;
+        this.firstTrack=true;
     }
 
     scrollBarShowFiles() {
@@ -480,6 +678,23 @@ let AudioPlayer = class {
         this.updateFilelist(startIndex,lastIndex);
     }
 
+    // used by longBar and player's seek icons
+    seekTo(_timeInSeconds) {
+        if (!this.track) return `The track is empty`;
+        vars.DEBUG && console.log(`Seeking to ${_timeInSeconds}s`);
+        if (this.track.duration<_timeInSeconds) {
+            let duration = this.track.duration;
+            this.currentTrackTime = duration-1;
+            this.track.setSeek(this.currentTrackTime);
+            this.setTrackPosition();
+            return;
+        };
+        this.currentTrackTime = _timeInSeconds;
+        this.track.setSeek(this.currentTrackTime);
+        this.setTrackPosition();
+        return;
+    }
+
     setCurrentTrack(_trackInt=1, _timeInt=0) { // this is called externally
         vars.DEBUG && console.log(`🎼 Setting current track to ${_trackInt} and position to ${_timeInt}`);
         this.currentTrackInt = _trackInt;
@@ -489,7 +704,7 @@ let AudioPlayer = class {
         // update the play list
         !_timeInt && (this.crcForPlaylist && this.updateSavedPlaylist(), this.phaserObjects.trackInt.setText(`TRACK ${this.currentTrackInt} (00:00 / 00:00)`)); // if the user clicked a track the timeInt will be 0, we need to update the saved playlists
 
-        this.emptyGroup();
+        this.emptyGroup(false);
 
         return true;
     }
@@ -513,6 +728,9 @@ let AudioPlayer = class {
 
         // if the screen saver exists update the track and time
         vars.App.screenSaver && vars.App.screenSaver.changeCurrentTrackIntAndTime(this.currentTrackInt,positionAsText,percentage);
+
+        // if the longBar exists, update the pointer position
+        vars.App.longBar && vars.App.longBar.updatePointerPosition(percentage);
     }
 
     showInfoButton(_show=true) {
@@ -545,6 +763,21 @@ let AudioPlayer = class {
         this.flushToLocalStorage();
     }
 
+    skipsBringToTop() {
+        // Bring the lS.skip button to the top
+        let options = vars.localStorage.options;
+        let btns = [];
+        let pO = this.phaserObjects;
+        switch (options.skipAmount) {
+            case 10:  btns = [pO.back10s,pO.forward10s]; break;
+            case 60:  btns = [pO.back1m,pO.forward1m];   break;
+            case 300: btns = [pO.back5m,pO.forward5m];   break;
+            case 600: btns = [pO.back10m,pO.forward10m]; break;
+        };
+        this.container.bringToTop(btns[0]);
+        this.container.bringToTop(btns[1]);
+    }
+
     // AFTER DRAWING THE LIST OF FILES WE NEED TO REORDER
     // THE OBJECTS SO THE FILES ARE BEHIND THE MAIN
     // PLAYER OBJECT AND THE BG IS THEN SENT BEHIND THAT
@@ -565,34 +798,66 @@ let AudioPlayer = class {
         let track = this.track = scene.sound.add('currentTrack');
         track.play();
 
+        // reset the completed and completedDate vars if approp
+        let pL = vars.localStorage.playlists[this.crcForPlaylist];
+        if (this.firstTrack && pL.complete) { // was completed, delete the date and reset comp var
+            pL.complete=false;
+            delete(pL.completionDate);
+            vars.localStorage.updateSavedPlaylist();
+        };
+
+        // only do these if this is NOT the first track
+        if (!this.firstTrack) {
+            // update the approp info on the screensaver
+            this.updateMinfoDataToScreenSaver();
+        };
+
+        let App = vars.App;
+        // this track is more than [long file length] seconds, show the long bar
+        track.duration>consts.longFileLength ? App.generateLongBar(track.duration) : App.destroyLongBar();
+
+        
         // screen saver updates
-        vars.App.screenSaver.updateBookImage();
-        this.showInfoButton(); // enable the button that gives access to the screen saver
+        let trackName = this.playlist[this.currentTrackInt-1];
+        if (this.firstTrack) {
+            App.screenSaver.changeTrackNameText(trackName);
+            App.screenSaver.updateBookImage(); // this will ignore repeat calls
+            this.showInfoButton(); // enable the button that gives access to the screen saver
+        };
+        
+        // PLAYER UI UPDATES
+        this.updateTrackTitle();
 
         // set the duration of this track
         vars.localStorage.playlists[this.crcForPlaylist].currentTrackLength=this.track.duration;
         // update the UI
         this.redrawPlaylist();
-        let trackName = this.playlist[this.currentTrackInt-1];
-        this.updateTrackTitle();
 
-        vars.App.screenSaver.changeTrackNameText(trackName);
 
-        if (this.currentTrackTime) { // this is a percent normalised
+        if (this.firstTrack && this.currentTrackTime) { // this is a percent normalised
             let seekTo = this.currentTrackTime*track.duration;
             vars.DEBUG && console.log(`Setting position to ${this.currentTrackTime} (${seekTo}s) of ${track.duration}`);
             track.setSeek(seekTo); // seek to the position in seconds
             this.setTrackPosition(); // update the UI
-
+        } else {
+            this.currentTrackTime=0;
         };
+
+
+
+        // WHEN THE TRACK ENDS
         track.on('complete', ()=> {
             vars.localStorage.playlists[this.crcForPlaylist].currentTrackLength=0;
+            if (this.currentTrackInt+1>this.playlist.length) {
+                this.albumComplete();
+                return;
+            };
             vars.App.player.getNextOrPreviousTrack();
         });
 
-        this.currentTrackTime=0;
-
+        // after everything has finished updating, set playing to true
         this.playing = true;
+        this.firstTrack=false; // and set first track to false which deals with updating the screensaver
     }
 
     stopAndDestroyCurrentTrack() {
@@ -625,67 +890,13 @@ let AudioPlayer = class {
         });
     }
 
-    updatePlayList(_playlist, _empty=true) { // sending just a playlist will empty the current one. if the new tracks are to be added to the current list, set _empty to false when calling
-        // is this the same playlist (crc) as the one currently loaded into the player?
-        if (this.crcForPlaylist && this.crcForPlaylist===_playlist.crc) return false;
-        
-        // NEW PLAYLIST WAS SENT
-        if (!_playlist.tracks.length) {
-            let error = 'No tracks in the playlist!';
-            this.errors.splice(0,0,error);
-            vars.DEBUG && console.warn(error);
-            return error;
-        };
-        !this.currentTrackInt && this.setCurrentTrack(); // initialise the current track if it hasnt been set yet
+    updateMinfoDataToScreenSaver() {
+        if (!this.moreInfo) return false;
 
-        this.binIcon.setAlpha(1);
+        vars.DEBUG && console.log(`Updating the minfo on the screen saver`);
+        let minfo = this.moreInfo;
+        debugger;
 
-        _empty && this.emptyPlaylist(); // empty out the playlist (if it exists and was requested)
-
-        this.playlist = [...this.playlist,..._playlist.tracks]; // add the new playlist
-
-        // this.FOLDER MUST ALWAYS BE SET NOW. ILL KEEP THE TEST THOUGH TO TEST THAT IT DOES EXIST
-        let folder = this.folder = _playlist.folder ? _playlist.folder : null; // was a folder passed (always the case now)
-        if (!folder) {
-            let msg = `The folder can no longer be empty!`;
-            this.errors.splice(0,0,msg);
-            console.error(msg);
-            return msg;
-        };
-
-        // set the internal crc to link back to the playlist
-        this.crcForPlaylist = _playlist.crc;
-        // now, with that info we can set the current track and position
-        let lV = vars.localStorage;
-        let pL = lV.playlists[this.crcForPlaylist];
-        this.currentTrackInt = pL.currentTrack;
-        let trackName = _playlist.tracks[this.currentTrackInt-1];
-        this.currentTrackTime = pL.position;
-
-        let pAT = this.positionAsText = pL.positionAsText ? pL.positionAsText : null;
-        
-        // update the position of the track bar
-        this.setTrackPosition();
-
-        // SCREEN SAVER UI UPDATE
-        if (vars.App.screenSaver) {
-            let sS = vars.App.screenSaver;
-            sS.changeFolder(folder);
-            sS.changeTrackNameText(trackName);
-            sS.changeCurrentTrackIntAndTime(this.currentTrackInt, pAT);
-            sS.updateTimeBar(this.currentTrackTime);
-        };
-
-        // REDRAW THE PLAYLIST
-        this.playlist.length && this.drawPlaylist(folder); // now draw the list
-    }
-
-    updatePlayListSingleFile(_folder=null, _file=null) {
-        this.playlist.push(_file); // add the new playlist
-
-        this.crcForPlaylist = null; // NOTE: the crcForPlaylist var is nullified here. if the crc doesnt exist when the user hits play it will be generated
-        this.binIcon.setAlpha(1);
-        this.drawPlaylist(_folder);
     }
 
     updateSavedPlaylist() { // this is called when we change tracks, it resets the position and currentTrackLength
@@ -728,15 +939,12 @@ let AudioPlayer = class {
         if (this.track && this.playing) {
             this.decrementPlaylistTimeout();
 
+            this.reduceScreenSaverTimeout();
+
             if (!this.updatePlaylistTimeout) {
                 this.playlistTimeout();
                 this.reduceFlushTimeout();
-                
-                this.reduceScreenSaverTimeout();
-
-
             };
         };
-
     }
 };

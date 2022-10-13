@@ -11,11 +11,31 @@ let HTTPRequest = class {
 
         this.endpoint = _endpoint;
 
+        let postVars;
+
         switch (this.endpoint) {
             case 'getFolder.php':
                 this.folder = _rqVars.folderName ? _rqVars.folderName : '';
-                let postVars = this.folder ? `folder=${this.folder}` : null;
+                postVars = this.folder ? `folder=${this.folder}` : null;
                 this.doRequest(postVars ? postVars : null);
+            break;
+
+            case 'getMinfo.php':
+                if (!_rqVars.folderName || !_rqVars.crc) return false;
+
+                this.folder = _rqVars.folderName;
+
+                postVars = `folder=${this.folder}&crc=${_rqVars.crc}`;
+                this.doRequest(postVars);
+            break;
+
+            case 'getBookImagesForFolder.php':
+                if (!_rqVars.folderName) return false;
+
+                this.folder = _rqVars.folderName;
+
+                postVars = `folder=${this.folder}`;
+                this.doRequest(postVars);
             break;
         };
 
@@ -38,10 +58,17 @@ let HTTPRequest = class {
 
         // when the response comes back, which function should be called?
         let rsFn;
+        let delay = true; // this delay is sometimes needed when the pop up is shown
         if (url.includes('getFolder.php')) {
             rsFn = !_post ? this.dealWithGetFolderResponse : this.dealWithGetSubFolderResponse;
             let msg = _post && _post.includes('folder=') ? `Loading File List for\n\n${_post.replace('folder=','')}\n\nPlease Wait` : 'Loading Main File List\n\nPlease Wait';
             vars.UI.showPopup(true,msg);
+        } else if (url.includes('getMinfo.php')) {
+            rsFn = this.dealWithMinfoResponse;
+            delay = false;
+        } else if (url.includes('getBookImagesForFolder.php')) {
+            rsFn = this.dealWithBookImageResponse;
+            delay = false;
         };
 
         if (!rsFn) {
@@ -62,10 +89,22 @@ let HTTPRequest = class {
         };
 
         // DO THE REQUEST
-        scene.tweens.addCounter({
-            from: 0, to: 1, duration: 500,
-            onComplete: ()=> { _post ? http.send(_post) : http.send(); }
-        })
+        if (delay) {
+            scene.tweens.addCounter({
+                from: 0, to: 1, duration: 500,
+                onComplete: ()=> { _post ? http.send(_post) : http.send(); }
+            });
+        } else {
+            _post ? http.send(_post) : http.send();
+        };
+    }
+
+    dealWithBookImageResponse(_rs) {
+        if (_rs['ERROR']) {
+            console.error(_rs['ERROR']);
+            return false;
+        };
+        vars.App.screenSaver.imageArray = _rs.images;
     }
 
     dealWithGetFolderResponse(_rs) {
@@ -95,8 +134,17 @@ let HTTPRequest = class {
         vars.UI.showPopup(false);
     }
 
+    dealWithMinfoResponse(_rs) {
+        if (_rs['ERROR'] || _rs['WARNING']) {
+            console.log('Response from moreInfo endpoint',_rs);
+            return false;
+        };
+        vars.App.player.moreInfo = _rs;
+        vars.App.player.addMinfoDataToScreenSaver();
+    }
+
     dealWithResponse(_response) {// default response handler --- should NEVER be used as each endpoint has its own response handler
         debugger;
     }
 
-}
+};

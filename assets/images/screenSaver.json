@@ -50,6 +50,69 @@
 						"w": 188,
 						"h": 174
 					}
+				},
+				{
+					"filename": "surroundIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 100,
+						"h": 99
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 100,
+						"h": 99
+					},
+					"frame": {
+						"x": 194,
+						"y": 554,
+						"w": 100,
+						"h": 99
+					}
+				},
+				{
+					"filename": "stereoIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 90,
+						"h": 30
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 90,
+						"h": 30
+					},
+					"frame": {
+						"x": 194,
+						"y": 657,
+						"w": 90,
+						"h": 30
+					}
+				},
+				{
+					"filename": "monoIcon",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 40,
+						"h": 30
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 40,
+						"h": 30
+					},
+					"frame": {
+						"x": 194,
+						"y": 691,
+						"w": 40,
+						"h": 30
+					}
 				}
 			]
 		}

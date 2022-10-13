@@ -4,11 +4,19 @@ let FolderList = class {
         this.preInits();
 
         this.folderList = _folderList;
-        this.updateFolders()
+        this.updateFolders();
     }
 
     preInits() {
         this.container = scene.add.container().setName('folderListContainer').setDepth(consts.depths.mainFolderList);
+    }
+
+    disableClicks(_disable=true) {
+        this.container.getAll().forEach((_c)=> {
+            if (_c.name.startsWith('folder_')) {
+                _disable ? _c.disableInteractive() : _c.setInteractive();
+            };
+        });
     }
 
     drawFolderList() {
@@ -19,12 +27,16 @@ let FolderList = class {
         let yInc = 42;
 
         this.folderList.forEach((_f,_i)=> {
-            let folderIcon = scene.add.image(startXY.x, startXY.y, 'ui', 'folderIcon').setOrigin(0);
-            let folderName = scene.add.text(startXY.x+70, startXY.y+5, _f, font).setTint(tint).setName(`folder_${_i}`).setInteractive();
+            let stateIconTexture = vars.App.getStateIconForFolder(_f);
+            let stateIcon = scene.add.image(startXY.x, startXY.y+5,'ui',stateIconTexture).setOrigin(0);
+
+            let folderIcon = scene.add.image(startXY.x+40, startXY.y, 'ui', 'folderIcon').setOrigin(0);
+            let folderName = scene.add.text(startXY.x+110, startXY.y+5, _f, font).setName(`folder_${_i}`).setInteractive();
+            vars.webgl ? folderName.setTint(tint) : folderName.setAlpha(0.5);
             folderName.setData({ folderName: _f });
             
             startXY.y += yInc;
-            this.container.add([folderIcon, folderName]);
+            this.container.add([stateIcon,folderIcon, folderName]);
         });
 
         
@@ -54,4 +66,4 @@ let FolderList = class {
 
         this.drawFolderList();
     }
-}
+};

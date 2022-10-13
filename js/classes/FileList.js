@@ -54,7 +54,9 @@ let FileList = class {
 
         this.filesGroup = scene.add.group().setName('files');
 
-        let bg = this.phaserObjects.containerBG = scene.add.image(0,0,'whitepixel').setName('fileListBG').setOrigin(0).setTint(0x222222).setAlpha(0.95);
+        let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
+        let bg = this.phaserObjects.containerBG = scene.add.image(0,0,texture).setName('fileListBG').setOrigin(0).setAlpha(0.95);
+        vars.webgl && bg.setTint(0x222222);
         this.container.add(bg);
 
     }
@@ -64,7 +66,7 @@ let FileList = class {
         let is_object = checkType(_objects, 'object');
         if (!is_array || !is_object) return false;
 
-        vars.DEBUG && console.log(`Adding an ${ is_array ? 'array of objects' : 'object'} to the File List container`);
+        vars.DEBUG && console.log(`Adding an ${ is_array ? `array of ${_objects.length} objects` : 'object'} to the File List container`);
         this.container.add(_objects);
         return true;
     }
@@ -116,6 +118,10 @@ let FileList = class {
         let fLPos = 0;
         let itemTint = fV.colours.bright_1;
         this.folderList.forEach((_f,_i)=> {
+            let entry = Object.entries(vars.localStorage.playlists).find(m=>m[1].folder===_f || m[1].folder.startsWith(_f) || m[1].folder.endsWith(_f));
+            let texture = !entry ? 'neverAccessed' : entry[1].complete ? 'complete' : 'incomplete';
+            let stateIcon = scene.add.image(startXY.x-40, startXY.y+5,'ui',texture).setOrigin(0);
+
             let folderIcon = scene.add.image(startXY.x, startXY.y, 'ui', 'folderIcon').setOrigin(0);
             folderIcon.fLPos=fLPos;
             let folderName = scene.add.text(startXY.x+60, startXY.y+5, _f, font).setName(`folder_${_i}`).setData({subFolder: true, parentFolder: this.folderName, folderName: _f }).setTint(itemTint).setInteractive();
@@ -131,8 +137,8 @@ let FileList = class {
             
             startXY.y += this.yInc;
 
-            this.addAllToContainer([folderIcon, folderName]);
-            this.filesGroup.addMultiple([folderIcon,folderName]);
+            this.addAllToContainer([stateIcon,folderIcon, folderName]);
+            this.filesGroup.addMultiple([stateIcon,folderIcon,folderName]);
 
             fLPos++;
         });
@@ -143,7 +149,7 @@ let FileList = class {
             let fileIcon = scene.add.image(startXY.x, startXY.y, 'ui', 'audioFileIcon').setOrigin(0);
             fileIcon.fLPos = fLPos;
             let fileNameSansExt = _f.replace(consts.fileExtensionRegEx,'');
-            let fileName = scene.add.text(startXY.x+60, startXY.y+5, fileNameSansExt, font).setName(`file_${_i}`).setTint(itemTint).setInteractive();
+            let fileName = scene.add.text(startXY.x+60, startXY.y+5, fileNameSansExt, font).setName(`file_${_i}`).setTint(itemTint);
             fileName.fLPos = fLPos;
             if (fileName.y+fileName.height>this.maxContainerHeight) {
                 fileIcon.setVisible(false); fileName.setVisible(false);
@@ -188,13 +194,13 @@ let FileList = class {
         // THE REST OF THE STUFF TO BE ADDED TO THE CONTAINER ARE JUST ICONS ETC
         // FINISH OFF THE LIST CONTAINER - SETTING ITS SIZE, CREATING A BORDER ETC
         heightOfContainer<500 && (heightOfContainer=500);
+        widthOfContainer>this.maxContainerWidth && (widthOfContainer=this.maxContainerWidth);
         // Scroll Bar if needed
         if (heightOfContainer>this.maxContainerHeight) {
             this.addScrollBar(widthOfContainer, heightOfContainer);
             heightOfContainer = this.maxContainerHeight;
         };
 
-        widthOfContainer>this.maxContainerWidth && (widthOfContainer=this.maxContainerWidth);
         this.container.setSize(widthOfContainer+80, heightOfContainer+40);
 
         // update the bg size

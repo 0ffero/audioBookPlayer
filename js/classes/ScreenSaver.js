@@ -8,26 +8,32 @@ let ScreenSaver = class {
         this.imageArray = []; // this is filled by the dealWithGetSubFolderResponse in HTTPRequest
         this.imagesLoading = [];
         this.imagesLoaded = [];
+        this.imageForCurrentBookLoaded = false;
         this.init();
     }
 
     init() {
+        this.group = scene.add.group().setName('fileData'); // only used if file data was available
         this.container = scene.containers.screenSaver = scene.add.container().setName('ScreenSaver').setDepth(consts.depths.screensaver);
         let cC = consts.canvas;
         let fV = vars.fonts;
-        let fontLarge = { ...fV.default, ...{ fontSize: '52px'}, color: '#999999'};
-        let fontSmall = { ...fV.default, ...{ fontSize: '42px', color: '#666666'}};;
+        let fontLarge = { ...fV.default, ...{ fontSize: '52px', color: '#999999'}};
+        let fontSmall = { ...fV.default, ...{ fontSize: '42px', color: '#666666'}};
         let pO = this.phaserObjects;
-        pO.bg = scene.add.image(cC.cX, cC.cY,'whitepixel').setScale(cC.width,cC.height).setTint(0x0).setName('screenSaverBG').setInteractive();
+        let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
+        pO.bg = scene.add.image(cC.cX, cC.cY,texture).setScale(cC.width,cC.height).setName('screenSaverBG').setInteractive();
+        vars.webgl && pO.bg.setTint(0x0);
         
         let x = 100;
-        pO.folderText = scene.add.text(x,  cC.height*0.25, 'FOLDERNAME GOES HERE', fontLarge);
+        pO.folderText = scene.add.text(x,  cC.height*0.1, 'FOLDERNAME GOES HERE', fontLarge);
 
-        pO.trackNameText = scene.add.text(x,  cC.height*0.35, 'CURRENT FILENAME GOES HERE', fontSmall);
+        pO.trackNameText = scene.add.text(x,  cC.height*0.2, 'CURRENT FILENAME GOES HERE', fontSmall);
 
-        pO.currentTrackIntAndTime = scene.add.text(x,  cC.height*0.45, 'Current track # 00:00:00 of 00:00:00', fontSmall);
+        pO.currentTrackIntAndTime = scene.add.text(x,  cC.height*0.3, 'Current track # 00:00:00 of 00:00:00', fontSmall);
 
-        pO.timeBar = scene.add.image(0,cC.height,'whitepixel').setTint(0x0085B2).setScale(cC.width,30).setOrigin(0,1);
+        let tBTexture = vars.webgl ? 'whitepixel' : 'positionBarPixel';
+        pO.timeBar = scene.add.image(0,cC.height,tBTexture).setScale(cC.width,30).setOrigin(0,1);
+        vars.webgl && pO.timeBar.setTint(0x0085B2);
 
         pO.coverImage = scene.add.image(cC.width*0.75,cC.cY,'screenSaver','noBooksImages');
         let cR = pO.coverImage.getRightCenter();
@@ -38,6 +44,62 @@ let ScreenSaver = class {
 
         this.container.alpha=0;
 
+    }
+
+    // this is called from AudioPlayer
+    // only if there is file data available
+    // if there isnt, the group simply contains the Folder Text, Track Name Text, Track Int and Current Time
+    addFileData(_fileData) {
+        let cC = consts.canvas;
+        let fV = vars.fonts;
+        let fontLarge = { ...fV.default, ...{ fontSize: '52px', color: '#999999'}};
+        let fontSmall = { ...fV.default, ...{ fontSize: '42px', color: '#666666'}};
+        // empty the groups current contents
+        this.group.clear(true,true);
+
+        let x = 100;
+        let y = cC.height*0.05;
+        let padding = 24;
+        
+        // delete any of the data that we wont be using
+        // move the audio stuff into its own object and delete it from the file data
+        let audioObject = { samplerate: _fileData.samplerate, channels: _fileData.channels, bitrate: _fileData.bitrate };
+        ['samplerate', 'channels', 'bitrate'].forEach(e => delete(_fileData[e]));
+        // and show the new details
+        let keyList = ['bookName', 'trackName', 'performer', 'duration', 'released', 'recorded', 'synopsis'];
+        keyList.forEach((_k)=> {
+            if (_k!=='duration') {
+                let font = _k==='bookName' ? fontLarge : fontSmall;
+                let textObject = scene.add.text(x, y, _fileData[_k], font);
+                _k==='synopsis' && (textObject.setWordWrapWidth(1400));
+                this.container.add(textObject);
+                this.group.add(textObject);
+
+                y = textObject.y+textObject.height + padding;
+            } else {
+                let pO = this.phaserObjects;
+                pO.currentTrackIntAndTime.y=y;
+                y = pO.currentTrackIntAndTime.y+pO.currentTrackIntAndTime.height + padding;
+            };
+        });
+        // and the audio details
+        y = cC.height-60;
+        let audioText = scene.add.text(x,y,`${audioObject.samplerate}, ${audioObject.bitrate}`,fontSmall).setOrigin(0,1);
+        this.container.add(audioText);
+        this.group.add(audioText);
+
+        let channelFrame = `${audioObject.channels.toLowerCase()}Icon`;
+        if (channelFrame!=='Icon') {
+            x = audioText.x+audioText.width+32;
+            let channelsIcon = scene.add.image(x,y-5,'screenSaver',channelFrame).setOrigin(0,1);
+            this.container.add(channelsIcon);
+            this.group.add(channelsIcon);
+        };
+
+        // and hide the old data that isnt needed anymore
+        ['folderText','trackNameText'].forEach((_pO)=> {
+            this.phaserObjects[_pO].alpha=0;
+        });
     }
 
     addLoadHandler(_key) {
@@ -90,6 +152,10 @@ let ScreenSaver = class {
     }
 
     loadBookImages() {
+        // set the images to loaded
+        // this will stop the current album attempting to
+        // load a new image every time the track changes
+        this.imageForCurrentBookLoaded=true;
         // LOAD THE IMAGES
         this.imagesLoading = [];
         this.imagesLoaded = [];
@@ -139,6 +205,7 @@ let ScreenSaver = class {
 
     updateBookImage() {
         if (!this.imageArray.length) return false;
+        if (this.imageForCurrentBookLoaded) return;
         vars.DEBUG && console.log(`Loading the cover image(s) for the screen saver`);
 
         this.loadBookImages();
