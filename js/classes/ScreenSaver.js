@@ -9,6 +9,7 @@ let ScreenSaver = class {
         this.imagesLoading = [];
         this.imagesLoaded = [];
         this.imageForCurrentBookLoaded = false;
+        this.extended = false;
         this.init();
     }
 
@@ -50,6 +51,7 @@ let ScreenSaver = class {
     // only if there is file data available
     // if there isnt, the group simply contains the Folder Text, Track Name Text, Track Int and Current Time
     addFileData(_fileData) {
+        this.extended = true;
         let cC = consts.canvas;
         let fV = vars.fonts;
         let fontLarge = { ...fV.default, ...{ fontSize: '52px', color: '#999999'}};
@@ -70,7 +72,7 @@ let ScreenSaver = class {
         keyList.forEach((_k)=> {
             if (_k!=='duration') {
                 let font = _k==='bookName' ? fontLarge : fontSmall;
-                let textObject = scene.add.text(x, y, _fileData[_k], font);
+                let textObject = this.phaserObjects[_k] = scene.add.text(x, y, _fileData[_k], font);
                 _k==='synopsis' && (textObject.setWordWrapWidth(1400));
                 this.container.add(textObject);
                 this.group.add(textObject);
@@ -216,6 +218,12 @@ let ScreenSaver = class {
         let widthOfScreen = consts.canvas.width;
 
         tB.setScale(widthOfScreen*_percent, tB.scaleY);
+    }
+
+    updateTrackName(_trackName=null) {
+        if (!this.extended || !_trackName) return false;
+
+        this.phaserObjects.trackName.setText(_trackName);
     }
 
 };

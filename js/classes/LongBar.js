@@ -18,6 +18,8 @@ let LongBar = class {
         this.timeInSeconds = 0;
         this.fadeOutDelay = this.fadeOutDelayMax = 2*60;
 
+        this.isChangingSeekTime = false; // used while the user is dragging the seek bar, to stop it from updating the pointer position
+
         this.initUI();
     }
 
@@ -38,7 +40,7 @@ let LongBar = class {
         let cC = consts.canvas;
         let alpha = 1;
         let container = this.container = scene.add.container().setName('longFileBar').setDepth(consts.depths.longBar).setAlpha(alpha);
-        container.setPosition((cC.width-width)/2, cC.height*0.85);
+        container.setPosition((cC.width-width)/2, cC.height*0.8);
         let fadeInTween = scene.add.tween({
             targets: container,
             alpha: alpha,
@@ -115,6 +117,17 @@ let LongBar = class {
         this.fadeOutDelay = 0;
     }
 
+    dragEnd() {
+        this.isChangingSeekTime = false;
+        this.setPlayerSeek();
+    }
+    dragStart() {
+        this.isChangingSeekTime = true;
+    }
+    dragUpdate() {
+        this.updateSetToTime();
+    }
+
     HMSToTimeString(_hms) {
         return `${_hms.h}:${_hms.m.toString().padStart(2,'0')}:${_hms.s.toString().padStart(2,'0')}`;
     }
@@ -131,7 +144,7 @@ let LongBar = class {
 
     // called when dragging the long bar pointer ends
     setPlayerSeek() {
-        this.startFadeOutDelay();
+        this.startFadeOutDelay(); // should this be reseting the timeout now (which stops it), as leaving the container now starts the fade out delay??? POSSIBLE TODO
         vars.App.player.seekTo(this.timeInSeconds);
     }
 
@@ -153,8 +166,16 @@ let LongBar = class {
     }
 
     updatePointerPosition(_percentage) {
+        if (this.isChangingSeekTime) return false;
+
         let lBP = this.phaserObjects.longBarPointer;
         lBP.x = lBP.maxX*_percentage;
+
+        this.updatePositionTimer();
+    }
+
+    updatePositionTimer() {
+        this.updateSetToTime();
     }
 
     // called externally when draggin the long bar pointer
@@ -163,6 +184,5 @@ let LongBar = class {
         let hms = convertSecondsToHMS(this.timeInSeconds);
         let hmsString = this.HMSToTimeString(hms);
         this.phaserObjects.seekTime.setText(hmsString);
-        this.disableFadeOut();
     }
 };

@@ -53,6 +53,8 @@ let AudioPlayer = class {
 
         this.screenSaverTimeout = this.screenSaverTimeoutMax = 10*frames;
 
+        this.isChangingSeekTime = false; // used while the user is dragging the seek bar
+
         this.initUI();
     }
     initUI() {
@@ -138,6 +140,10 @@ let AudioPlayer = class {
         trackPositionBar.delta  = trackPositionBar.maxX - trackPositionBar.minX;
 
         let trackPosition       = this.phaserObjects.trackPosition  = scene.add.image(trackPositionBar.minX, y, texture, 'trackPositionPointer').setName('trackPositionPointer').setInteractive();
+        vars.input.enableDrag(trackPosition);
+        trackPosition.minX=trackPositionBar.minX;
+        trackPosition.maxX=trackPositionBar.maxX;
+
         vars.plugins.add(trackPosition);
 
 
@@ -340,6 +346,36 @@ let AudioPlayer = class {
     // when the user closes the page, this function is called to quickly save the play list entries
     destroy() {
         
+    }
+
+    dragEnd() {
+        if (!this.track || !this.playing) return false;
+        this.isChangingSeekTime=false;
+        let seconds = this.tempSeekToVar;
+        this.tempSeekToVar=null;
+        this.seekTo(seconds);
+    }
+    dragStart() {
+        if (!this.track || !this.playing) return false;
+        this.isChangingSeekTime=true;
+        this.tempSeekToVar = null;
+    }
+    dragUpdate(_gameObject, _dragX) {
+        if (!this.track || !this.playing) return false;
+        // update the track position text
+        let dragX = _dragX;
+        let minX = _gameObject.minX;
+        let maxX = _gameObject.maxX;
+        dragX > maxX && (dragX=maxX);
+        dragX < minX && (dragX=minX);
+        _gameObject.x=dragX;
+
+        // figure out the time as if the user stops dragging here
+        let duration = this.track.duration;
+        let percent = clamp((dragX-minX)/(maxX-minX),0,1);
+        let seconds = percent*duration;
+        this.tempSeekToVar = seconds;
+        this.updateTrackIntAndTime(seconds,duration);
     }
 
     drawPlaylist(_folder=null) {
@@ -710,27 +746,23 @@ let AudioPlayer = class {
     }
 
     setTrackPosition() {
+        if (this.isChangingSeekTime) return false;
+
+        let App = vars.App;
         let percentage = this.currentTrackTime;
-
         let tPB = this.phaserObjects.trackPositionBar;
-        
         let x = tPB.delta*percentage + tPB.minX;
-
         this.phaserObjects.trackPosition.x = x;
 
-        if (!this.track) return;
-
-        // update the time readout
-        let time = convertSecondsToHMS(this.track.seek);
-        let duration = convertSecondsToHMS(this.track.duration);
-        let positionAsText = this.positionAsText = vars.App.generateTimeString(time,duration);
-        this.phaserObjects.trackInt.setText(`TRACK ${this.currentTrackInt} (${positionAsText})`);
-
-        // if the screen saver exists update the track and time
-        vars.App.screenSaver && vars.App.screenSaver.changeCurrentTrackIntAndTime(this.currentTrackInt,positionAsText,percentage);
-
         // if the longBar exists, update the pointer position
-        vars.App.longBar && vars.App.longBar.updatePointerPosition(percentage);
+        App.longBar && App.longBar.updatePointerPosition(percentage);
+
+        if (!this.track || this.isChangingSeekTime) return;
+
+        let positionAsText = this.updateTrackIntAndTime();
+        // if the screen saver exists update the track and time
+        App.screenSaver && App.screenSaver.changeCurrentTrackIntAndTime(this.currentTrackInt,positionAsText,percentage);
+
     }
 
     showInfoButton(_show=true) {
@@ -822,9 +854,9 @@ let AudioPlayer = class {
         if (this.firstTrack) {
             App.screenSaver.changeTrackNameText(trackName);
             App.screenSaver.updateBookImage(); // this will ignore repeat calls
-            this.showInfoButton(); // enable the button that gives access to the screen saver
         };
         
+        this.showInfoButton(); // enable the button that gives access to the screen saver
         // PLAYER UI UPDATES
         this.updateTrackTitle();
 
@@ -896,6 +928,9 @@ let AudioPlayer = class {
         vars.DEBUG && console.log(`Updating the minfo on the screen saver`);
         let minfo = this.moreInfo;
         debugger;
+        let trackName = this.playlist[this.currentTrackInt-1];
+        let trackData = minfo[trackName];
+        vars.App.screenSaver.updateTrackName(trackData.Track);
 
     }
 
@@ -918,6 +953,27 @@ let AudioPlayer = class {
         this.updateFilelist(0,this.maxFilesPerPage);
 
         
+    }
+
+    updateTrackIntAndTime(_seconds=null,_duration=null) {
+        // update the time readout
+        let time; let duration;
+        if (_seconds) {
+            if (!_duration) {
+                let error = `Seconds were passed (${_seconds}), but no duration`;
+                console.warn(error);
+                return error;
+            };
+            time = convertSecondsToHMS(_seconds);
+            duration = convertSecondsToHMS(_duration);
+        } else {
+            time = convertSecondsToHMS(this.track.seek);
+            duration = convertSecondsToHMS(this.track.duration);
+        };
+        let positionAsText = this.positionAsText = vars.App.generateTimeString(time,duration);
+        this.phaserObjects.trackInt.setText(`TRACK ${this.currentTrackInt} (${positionAsText})`);
+
+        return positionAsText;
     }
 
     updateTrackTitle() {

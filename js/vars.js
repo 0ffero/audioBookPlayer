@@ -2,8 +2,8 @@
 var vars = {
     DEBUG: false,
 
-    version: 0.994,
-    edition: 'Less Buggy Edition',
+    version: 0.996,
+    edition: 'Very Less Buggy Edition',
 
     webgl: true,
 
@@ -291,6 +291,7 @@ var vars = {
         ready: false,
 
         folderList: null,
+        folderRequested: null, // this holds the folder that was requested. its used when the response is empty. if this happens its because json_encode failed when going through the folders entries
         foldersWithFileLists: [],
         fileListAddOrder: [],
         fileLists: {
@@ -518,6 +519,8 @@ var vars = {
                     player.stopAndDestroyCurrentTrack();
                     player.resetVars();
                     player.container.hide(); // hide the player
+
+                    vars.App.longBar && vars.App.longBar.destroy(), vars.App.longBar=null;
                     return true;
                 };
                 if (name==='info') { // only shows the screen saver (book over view) if a track is playing
@@ -616,6 +619,7 @@ var vars = {
 
             scene.input.on('gameobjectover', function (pointer, gameObject) {
                 let name = gameObject.name;
+                name.includes('Container') ? (game.canvas.style.cursor='grab') : name=='recentBG' ? (game.canvas.style.cursor='default') : (game.canvas.style.cursor='crosshair');
                 if (name.startsWith('folder_')) {
                     vars.webgl ? gameObject.setTint(vars.fonts.colours.white) : gameObject.setAlpha(1);
                 };
@@ -638,6 +642,7 @@ var vars = {
 
             scene.input.on('gameobjectout', function (pointer, gameObject) {
                 let name = gameObject.name;
+                game.canvas.style.cursor='default';
                 if (name.startsWith('folder_')) {
                     vars.webgl ? gameObject.setTint(vars.fonts.colours.bright_1) : gameObject.setAlpha(0.5);
                 };
@@ -660,14 +665,23 @@ var vars = {
 
                 let oName = gameObject.name;
 
-                if (oName.startsWith('scrollBar') || oName==='longBarPointer') return false;
+                if (oName.startsWith('scrollBar')) return false;
 
                 switch (oName) {
                     case 'fileListContainer': case 'folderListContainer':
-                        oName==='folderListContainer' && vars.App.folderList.disableClicks();
                         gameObject.isDragging=true;
-                        vars.containers.bringFileListToTop(gameObject);
-                        game.canvas.style.cursor='grabbing';
+                        oName==='fileListContainer' && vars.containers.bringFileListToTop(gameObject);
+                        oName==='folderListContainer' && vars.App.folderList.disableClicks();
+                    break;
+
+                    case 'longBarPointer':
+                        vars.App.longBar.dragStart();
+                        return;
+                    break;
+
+                    case 'trackPositionPointer':
+                        vars.App.player.dragStart();
+                        return;
                     break;
 
                     default:
@@ -690,7 +704,7 @@ var vars = {
                         dragX > gameObject.maxX && (dragX=gameObject.maxX);
                         dragX < 0 && (dragX=0);
                         gameObject.x=dragX;
-                        vars.App.longBar.updateSetToTime();
+                        vars.App.longBar.dragUpdate();
                         return true;
                     break;
 
@@ -706,6 +720,11 @@ var vars = {
                         dragY < gameObject.minY ? dragY=gameObject.minY : dragY > gameObject.maxY ? dragY=gameObject.maxY : dragY;
                         gameObject.y = dragY;
                         vars.App.player.scrollBarShowFiles();
+                        return true;
+                    break;
+
+                    case 'trackPositionPointer':
+                        vars.App.player.dragUpdate(gameObject, dragX);
                         return true;
                     break;
 
@@ -730,7 +749,13 @@ var vars = {
                     break;
 
                     case 'longBarPointer':
-                        vars.App.longBar.setPlayerSeek();
+                        vars.App.longBar.dragEnd();
+                        return;
+                    break;
+
+                    case 'trackPositionPointer':
+                        vars.App.player.dragEnd();
+                        return;
                     break;
                 }
             });
@@ -849,7 +874,7 @@ var vars = {
             if (vars.App.foldersWithFileLists.includes(folderName)) return false; // is the folder contents already visible? if so, exit.
 
             if (!_gameObject.getData('subFolder')) {
-                console.log(`Folder with the name "${folderName}" clicked.`);
+                vars.DEBUG && console.log(`Folder with the name "${folderName}" clicked.`);
 
                 new HTTPRequest('getFolder.php', { folderName: folderName });
                 return;

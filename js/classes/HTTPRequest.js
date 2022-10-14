@@ -16,6 +16,7 @@ let HTTPRequest = class {
         switch (this.endpoint) {
             case 'getFolder.php':
                 this.folder = _rqVars.folderName ? _rqVars.folderName : '';
+                vars.App.folderRequested = this.folder;
                 postVars = this.folder ? `folder=${this.folder}` : null;
                 this.doRequest(postVars ? postVars : null);
             break;
@@ -24,6 +25,7 @@ let HTTPRequest = class {
                 if (!_rqVars.folderName || !_rqVars.crc) return false;
 
                 this.folder = _rqVars.folderName;
+                vars.App.folderRequested = this.folder;
 
                 postVars = `folder=${this.folder}&crc=${_rqVars.crc}`;
                 this.doRequest(postVars);
@@ -33,6 +35,8 @@ let HTTPRequest = class {
                 if (!_rqVars.folderName) return false;
 
                 this.folder = _rqVars.folderName;
+                vars.App.folderRequested = this.folder;
+
 
                 postVars = `folder=${this.folder}`;
                 this.doRequest(postVars);
@@ -79,8 +83,15 @@ let HTTPRequest = class {
         http.onreadystatechange = function() { // when state changes.
             if (http.readyState == 4 && http.status == 200) { // we have a valid response, send it to the parser function
                 if (!http.responseText) {
-                    console.error('The reponse was empty!');
-                    debugger;
+                    let rqf = vars.App.folderRequested.replace(/ /g,'%20',vars.App.folderRequested);
+                    vars.App.folderRequested = null;
+                    let url = `${window.location.href}/endpoints/folderTest.php?folderName=${rqf}`;
+                    let message = `The reponse was empty!\nThis generally means theres a file in the folder that json doesnt like.`;
+                    alert(message + `\nThe URL to test the folder is console :)`);
+                    let consoleMessage = `${message}\n\nTo test the folder open the following URL in the browser.\n\n${url}`
+                    console.error(consoleMessage);
+                    vars.UI.showPopup(false);
+                    return false;
                 };
 
                 let rs = JSON.parse(http.responseText);
