@@ -15,7 +15,7 @@ let AudioPlayer = class {
         // we now always generate the container
         this.container = scene.add.container().setName('audioPlayer').setDepth(consts.depths.player);
         let containerX = _defaults.containerX||0;
-        let containerY = _defaults.containerY||0;
+        let containerY = this.startY =  _defaults.containerY||0;
         this.container.setPosition(consts.canvas.width+20,containerY);
         this.container.startX = containerX;
 
@@ -149,6 +149,9 @@ let AudioPlayer = class {
 
         // NOW BUILD THE PLAYLIST
         let playlistBG = this.phaserObjects.playlistBG = scene.add.image(0, upperHeight, texture, 'playlistBG').setOrigin(0);
+        // THE ACTUAL PLAY LIST IS ADDED LATER, THIS IS JUST INITIALISING IT
+        let fullNamePopup = this.phaserObjects.fullNamePopup = scene.add.text(this.container.startX-20,playlistBG.y+10,'full name of file', headingFont).setOrigin(1,0.5).setDepth(consts.depths.fullNamePopup);
+        this.showFullNamePopup(false);
 
         // FINALLY ADD THE ICONS THAT CONTROL THE CURRENT LIST
         // BIN, SAVE, RECENT AND INFO ICONs
@@ -180,8 +183,6 @@ let AudioPlayer = class {
 
         // ADD THE SCROLL BAR
         this.addScrollBar();
-
-        // THE ACTUAL PLAY LIST IS ADDED LATER, THIS IS JUST INITIALISING EVERYTHING
     }
 
     addAllToContainer(_objects) {
@@ -200,7 +201,7 @@ let AudioPlayer = class {
         let showTween = scene.add.tween({
             targets: c,
             x: c.startX,
-            duration: 1000,
+            duration: 500,
             ease: 'Quad.easeOut',
             paused: true
         });
@@ -208,7 +209,7 @@ let AudioPlayer = class {
         let hideTween = scene.add.tween({
             targets: c,
             x: cC.width+20,
-            duration: 1000,
+            duration: 500,
             ease: 'Quad.easeIn',
             onComplete: ()=> { vars.phaserObjects.history.tweens.show.play(); },
             paused: true
@@ -222,10 +223,12 @@ let AudioPlayer = class {
         
         c.hide = ()=> {
             c.onScreen = false;
+            vars.audio.playSound('whooshOut');
             vars.animationsEnabled ? c.tweens.hide.play() : (c.x=cC.width+20, vars.phaserObjects.history.alpha=1 );
         };
         c.show = ()=> {
             c.onScreen = true;
+            vars.audio.playSound('whooshIn');
             if (vars.animationsEnabled) {
                 vars.phaserObjects.history.tweens.hide.play();
                 c.tweens.show.play();
@@ -409,6 +412,7 @@ let AudioPlayer = class {
             
             let entrySansExt = _entry.replace(consts.fileExtensionRegEx,'');
             let trackText = scene.add.text(x+intPadding, y, entrySansExt, font).setVisible(vis).setName(`player_track_${_i}`).setInteractive();
+            trackText.trackInt = _i;
             trackText.selected = isCurrentTrack;
             vars.webgl ? trackText.setTint(tint) : trackText.setAlpha(isCurrentTrack ? 1: 0.5);
             this.cropObject(trackText);
@@ -765,6 +769,21 @@ let AudioPlayer = class {
 
     }
 
+    showFullName(_gameObject) {
+        let trackInt = _gameObject.trackInt;
+        let text = this.playlist[trackInt];
+        let fNP = this.phaserObjects.fullNamePopup;
+        fNP.setText(text);
+        fNP.y=_gameObject.y+this.startY+20;
+        this.showFullNamePopup();
+    }
+
+    showFullNamePopup(_show=true) {
+        if (_show === this.phaserObjects.fullNamePopup.visible) return false;
+
+        this.phaserObjects.fullNamePopup.visible=_show;
+    }
+
     showInfoButton(_show=true) {
         let alpha=_show?1:0.2;
         this.phaserObjects.infoButton.setAlpha(alpha);
@@ -981,7 +1000,7 @@ let AudioPlayer = class {
         tT.setText(this.playlist[this.currentTrackInt-1]);
         // make sure the track title isnt bigger than 400px wide
         let maxW = 500;
-        if (tT.width>maxW) { tT.setCrop(0,0,maxW,tT.height); tT.x=380; } else { tT.x=300; };
+        if (tT.width>maxW) { tT.setCrop(0,0,maxW,tT.height); tT.x=430; } else { tT.x=300; };
     }
 
     update() {

@@ -22,11 +22,14 @@ const consts = {
         player          :  20,
         fileList        :  30,
         fileListOnTop   :  40,
-        recent          :  50,
-        screensaver     :  60,
-        longBar         :  70,
-        popup           :  80,
-        volume          : 100
+        fullNamePopup   :  50,
+        recent          :  60,
+        screensaver     :  70,
+        longBar         :  80,
+        popup           :  90,
+        volume          : 100,
+
+        loadingScreen   : 200
     },
 
     fileExtensionRegEx: /\.m[p4][ab34]/,

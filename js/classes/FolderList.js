@@ -26,12 +26,16 @@ let FolderList = class {
         let startXY = { x: 10, y: 10 };
         let yInc = 42;
 
+        let width=-Infinity;
+
         this.folderList.forEach((_f,_i)=> {
             let stateIconTexture = vars.App.getStateIconForFolder(_f);
             let stateIcon = scene.add.image(startXY.x, startXY.y+5,'ui',stateIconTexture).setOrigin(0);
 
             let folderIcon = scene.add.image(startXY.x+40, startXY.y, 'ui', 'folderIcon').setOrigin(0);
             let folderName = scene.add.text(startXY.x+110, startXY.y+5, _f, font).setName(`folder_${_i}`).setInteractive();
+            let w = folderName.x+folderName.width + 20;
+            w>width && (width=w);
             vars.webgl ? folderName.setTint(tint) : folderName.setAlpha(0.5);
             folderName.setData({ folderName: _f });
             
@@ -44,10 +48,19 @@ let FolderList = class {
         this.container.minY = 0;
         this.container.maxY = consts.canvas.height-height;
         
-        this.container.setSize(2560/2, height).setInteractive();
+        this.container.setSize(width, height).setInteractive();
         vars.input.enableDrag(this.container);
 
         this.setContainerSize();
+
+        let bg = this.generateBackGround();
+        this.container.add(bg).sendToBack(bg);
+    }
+    
+    generateBackGround() {
+        let height = this.container.height < consts.canvas.height ? consts.canvas.height : this.container.height;
+        let bg = scene.add.image(0,0,'pixel15').setScale(this.container.width, height).setOrigin(0);
+        return bg;
     }
 
     setContainerSize() {

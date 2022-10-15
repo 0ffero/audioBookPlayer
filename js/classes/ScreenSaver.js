@@ -36,7 +36,7 @@ let ScreenSaver = class {
         pO.timeBar = scene.add.image(0,cC.height,tBTexture).setScale(cC.width,30).setOrigin(0,1);
         vars.webgl && pO.timeBar.setTint(0x0085B2);
 
-        pO.coverImage = scene.add.image(cC.width*0.75,cC.cY,'screenSaver','noBooksImages');
+        pO.coverImage = scene.add.image(cC.width*0.75,cC.cY,'screenSaver','noBooksImages').setName('screenSaverBookImage');
         let cR = pO.coverImage.getRightCenter();
         pO.internetSearch = scene.add.image(cR.x-80,cR.y,'screenSaver','internetIcon').setOrigin(1,0.6).setName('internetSearch').setInteractive();
 
@@ -111,8 +111,11 @@ let ScreenSaver = class {
             let index = App.imagesLoading.findIndex((m=>m===key));
             App.imagesLoaded.push(App.imagesLoading.splice(index,1)[0]);
             if (App.imagesLoaded.length===1) { // first image has loaded, update the screen savers book image
-                vars.DEBUG && console.log(`    >> Book image 1 (of ${App.imagesLoading.length+1}) loaded. Updating the book image`);
+                vars.DEBUG && console.log(`  >> Book image 1 (of ${App.imagesLoading.length+1}) loaded. Updating the book image`);
                 App.showBookImage();
+            } else if (App.imagesLoaded.length>1) {
+                vars.DEBUG && console.log(`    >> Book image ${App.imagesLoaded.length} loaded`);
+                App.enableBookImageSwitch();
             };
         });
     }
@@ -139,6 +142,15 @@ let ScreenSaver = class {
     destroyCurrentBookImage() {
         this.phaserObjects.coverImage.destroy();
         this.phaserObjects.coverImage = null;
+    }
+
+    // When the images are loading in, if only one is loaded
+    // (because there is either only 1 image or the others failed)
+    // the image will not be clickable.
+    // However, if more than 1 image is loaded this will allow the user
+    // to click on the current image to switch to the next available
+    enableBookImageSwitch() {
+        this.phaserObjects.coverImage.setInteractive();
     }
 
     foldernameToURLSafe() {
@@ -174,12 +186,14 @@ let ScreenSaver = class {
     showBookImage(_imageIndex=0) {
         let cC = consts.canvas;
         let border = 20;
-        let maxW = 1000-border*2;
-        let maxH = cC.height-border*2;
+        let maxW = 1000-border*2;       // maxW = 960
+        let maxH = cC.height-border*2;  // maxH = 1400 (1440-20*2)
 
         this.destroyCurrentBookImage();
+        let totalImages = this.imagesLoaded.length;
         let imageKey = this.imagesLoaded[_imageIndex];
-        let cI = this.phaserObjects.coverImage = scene.add.image(cC.cX, cC.cY, imageKey);
+        let cI = this.phaserObjects.coverImage = scene.add.image(cC.cX, cC.cY, imageKey).setName('screenSaverBookImage');
+        if (totalImages>1) { cI.imageIndex = _imageIndex; cI.setInteractive(); }
 
         let w = cI.width;
         let h = cI.height;
@@ -193,6 +207,15 @@ let ScreenSaver = class {
         hMod ? cI.setOrigin(1,0).setPosition(cC.width-border,border) : cI.setOrigin(1,0.5).setPosition(cC.width-border,cC.cY);
 
         this.container.add(cI);
+    }
+
+    showNextBookImage() {
+        let iL = this.imagesLoaded;
+        if (!iL || !iL.length) return false;
+
+        let nextIndex = this.phaserObjects.coverImage.imageIndex+1;
+        nextIndex===iL.length && (nextIndex=0);
+        this.showBookImage(nextIndex);
     }
 
     searchForBookImages() {

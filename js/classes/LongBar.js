@@ -123,6 +123,7 @@ let LongBar = class {
     }
     dragStart() {
         this.isChangingSeekTime = true;
+        this.disableFadeOut();
     }
     dragUpdate() {
         this.updateSetToTime();
@@ -144,7 +145,7 @@ let LongBar = class {
 
     // called when dragging the long bar pointer ends
     setPlayerSeek() {
-        this.startFadeOutDelay(); // should this be reseting the timeout now (which stops it), as leaving the container now starts the fade out delay??? POSSIBLE TODO
+        //this.startFadeOutDelay(); // should this be reseting the timeout now (which stops it), as leaving the container now starts the fade out delay??? POSSIBLE TODO
         vars.App.player.seekTo(this.timeInSeconds);
     }
 
@@ -157,7 +158,7 @@ let LongBar = class {
     }
 
     updateFadeOutDelay() {
-        if (!this.fadeOutDelay) return false;
+        if (!this.fadeOutDelay || this.isChangingSeekTime) return false;
 
         this.fadeOutDelay--;
 

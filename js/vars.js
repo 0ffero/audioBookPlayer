@@ -2,15 +2,12 @@
 var vars = {
     DEBUG: false,
 
-    version: 0.996,
-    edition: 'Very Less Buggy Edition',
+    version: 0.999,
+    edition: 'Release Candidate 1',
 
     webgl: true,
 
-    TODO: [
-        'player.updateMinfoDataToScreenSaver needs to update the screensaver data if minfo exists',
-        'When selecting a recent, it doesnt load the image'
-    ],
+    TODO: [],
 
     animationsEnabled: true,
 
@@ -52,7 +49,8 @@ var vars = {
     files: {
         audio: {
             load: ()=> {
-
+                scene.load.audio('whooshIn','audio/whooshIn.ogg');
+                scene.load.audio('whooshOut','audio/whooshOut.ogg');
             }
         },
 
@@ -64,15 +62,17 @@ var vars = {
 
         images: {
             load: ()=> {
-                scene.load.image('whitepixel', 'images/whitepixel.png');
-                scene.load.image('blackpixel', 'images/blackpixel.png'); // needed for non webgl version
-                scene.load.image('positionBarPixel', 'images/positionBarPixel.png'); // needed for non webgl version
+                let f = 'images';
+                ['whitepixel','pixel15','pixel2','pixel3','pixel6','pixel9','pixelC'].forEach((_key)=> {
+                    scene.load.image(_key, `${f}/${_key}.png`);
+                });
+                scene.load.image('positionBarPixel', `${f}/positionBarPixel.png`); // needed for non webgl version
                 // PLAYER
-                scene.load.atlas('player', 'images/player.png', 'images/player.json');
+                scene.load.atlas('player', `${f}/player.png`, `${f}/player.json`);
                 // SCREEN SAVER
-                scene.load.atlas('screenSaver', 'images/screenSaver.png', 'images/screenSaver.json');
+                scene.load.atlas('screenSaver', `${f}/screenSaver.png`, `${f}/screenSaver.json`);
                 // UI
-                scene.load.atlas('ui', 'images/ui.png', 'images/ui.json');
+                scene.load.atlas('ui', `${f}/ui.png`, `${f}/ui.json`);
             }
         },
 
@@ -99,7 +99,7 @@ var vars = {
 
         init: ()=> {
             let depths = consts.depths;
-            !scene.containers ? scene.containers = {} : null;
+            !scene.containers && (scene.containers = {});
             scene.containers.popup = scene.add.container().setName('popup').setDepth(depths.popup);
         },
 
@@ -604,6 +604,10 @@ var vars = {
                     vars.App.screenSaver.hide();
                     return;
                 };
+                if (name==='screenSaverBookImage') {
+                    vars.App.screenSaver.showNextBookImage();
+                    return;
+                }
                 // END OF SCREEN SAVER BUTTONS
                 
 
@@ -626,6 +630,7 @@ var vars = {
 
                 if (name.startsWith('player_track_')) {
                     !vars.webgl && gameObject.setAlpha(1);
+                    vars.App.player.showFullName(gameObject);
                 };
 
                 if (name==='longFileBar') {
@@ -649,6 +654,7 @@ var vars = {
 
                 if (name.startsWith('player_track_')) {
                     !vars.webgl && gameObject.setAlpha(gameObject.selected ? 1: 0.5);
+                    vars.App.player.showFullNamePopup(false);
                 };
 
                 if (name==='longFileBar') {
@@ -797,6 +803,7 @@ var vars = {
             let gameObject = _gameObject;
             let files = gameObject.getData('files');
             let folder = gameObject.getData('folder');
+            if (vars.App.player.folder===folder) { vars.UI.showPopup(false); return false; };
             // GENERATE A CRC FOR THIS LIST AND ITS FOLDER
             let lV = vars.localStorage;
             let crcString = vars.localStorage.generateCRCString(folder,files);
@@ -974,7 +981,7 @@ var vars = {
                 paused: true,
             });
             history.tweens = { hide: hide, show: show };
-            let vText = scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<1 ? 'β': ''} (${vars.edition})`,vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
+            let vText = scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<0.999 ? 'β': vars.version<1 ? 'RC' : vars.version} (${vars.edition})`,vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
             let seconds = 1000;
             let delay = 30*seconds;
             vText.tween = scene.add.tween({ targets: vText, delay: delay, duration: 1000, alpha: 0.8, yoyo: true, loop: true});
@@ -1081,6 +1088,11 @@ var vars = {
             });
         },
 
+        destroyLoadingScreen: ()=> {
+            scene.containers.loadingScreen.destroy(true);
+            delete(scene.containers.loadingScreen);
+        },
+
         generateBackground: ()=> {
             let cC = consts.canvas;
             let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
@@ -1088,6 +1100,18 @@ var vars = {
             vars.webgl && bg.setTint(0x0);
 
             return bg;
+        },
+
+        generateLoadingScreen: ()=> {
+            !scene.containers && (scene.containers = {});
+            let container = scene.containers.loadingScreen =  scene.add.container().setName('loadingContainer').setDepth(consts.depths.loadingScreen);
+            container.fadeOut = scene.add.tween({
+                targets: container, alpha: 0, delay: 500, duration: 1000, paused: true, onComplete: vars.UI.destroyLoadingScreen
+            });
+            let cC = consts.canvas;
+            let bg = vars.UI.generateBackground();
+            let loadingImage = scene.add.image(cC.cX,cC.cY,'loadingScreen');
+            container.add([bg,loadingImage]);
         },
 
         showPopup: (_show=true, _msg='')=> {
