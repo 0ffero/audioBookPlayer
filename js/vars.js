@@ -2,10 +2,10 @@
 var vars = {
     DEBUG: false,
 
-    version: 0.999,
-    edition: 'Release Candidate 1',
+    version: 1.0,
+    edition: 'ABP1',
 
-    webgl: true,
+    webgl: false,
 
     TODO: [],
 
@@ -452,6 +452,7 @@ var vars = {
             });
 
             vars.input.initKeys();
+            vars.input.initCombos();
 
             // phaser objects
             scene.input.on('gameobjectdown', function (pointer, gameObject) {
@@ -665,6 +666,17 @@ var vars = {
             });
 
             vars.input.initDrags();
+        },
+        initCombos: ()=> {
+             // COMBOS
+             let sIK = scene.input.keyboard;
+
+             sIK.createCombo('webgl', { resetOnMatch: true });
+             sIK.on('keycombomatch', function (event) {
+                 let comboName = '';
+                 event.keyCodes.forEach( (cC)=> { comboName += String.fromCharCode(cC); });
+                 switch (comboName) { case 'WEBGL': vars.input.switchWEBGL(); break; };
+             });
         },
         initDrags: ()=> {
             scene.input.on('dragstart', function (pointer, gameObject) {
@@ -936,7 +948,15 @@ var vars = {
             let lV = vars.localStorage;
             lV.options.skipAmount=skipInSeconds;
             lV.saveOptions();
-        }
+        },
+
+        switchWEBGL: ()=> {
+            let o = vars.localStorage.options;
+            o.webgl = !o.webgl;
+            vars.localStorage.saveOptions();
+            vars.UI.showPopup(true, `WebGL has been ${o.webgl ? 'enabled' : 'disabled' }\n\nRestarting the app in 3 seconds.`);
+            scene.tweens.addCounter({ from: 0, to: 1, duration: 3000, onComplete: ()=> { window.location.reload(); }})
+        },
     },
 
     phaserObjects: {},
@@ -982,6 +1002,7 @@ var vars = {
             });
             history.tweens = { hide: hide, show: show };
             let vText = scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<0.999 ? 'β': vars.version<1 ? 'RC' : vars.version} (${vars.edition})`,vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
+            vars.webgl && scene.add.image(cC.width*0.75, cC.height-10, 'ui','webgl').setOrigin(0.5,1).setDepth(consts.depths.player-1);
             let seconds = 1000;
             let delay = 30*seconds;
             vText.tween = scene.add.tween({ targets: vText, delay: delay, duration: 1000, alpha: 0.8, yoyo: true, loop: true});

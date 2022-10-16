@@ -49,13 +49,16 @@ let AudioPlayer = class {
         this.phaserObjects = {};
 
         this.moreInfo = null;
-        this.minfoPassedToScreenSaver = false;
 
         this.screenSaverTimeout = this.screenSaverTimeoutMax = 10*frames;
 
         this.isChangingSeekTime = false; // used while the user is dragging the seek bar
 
+        this.initGraphics();
         this.initUI();
+    }
+    initGraphics() {
+        this.graphics = scene.add.graphics().setDepth(consts.depths.fullNamePopup);
     }
     initUI() {
         // set up the fonts we'll be using
@@ -150,7 +153,7 @@ let AudioPlayer = class {
         // NOW BUILD THE PLAYLIST
         let playlistBG = this.phaserObjects.playlistBG = scene.add.image(0, upperHeight, texture, 'playlistBG').setOrigin(0);
         // THE ACTUAL PLAY LIST IS ADDED LATER, THIS IS JUST INITIALISING IT
-        let fullNamePopup = this.phaserObjects.fullNamePopup = scene.add.text(this.container.startX-20,playlistBG.y+10,'full name of file', headingFont).setOrigin(1,0.5).setDepth(consts.depths.fullNamePopup);
+        let fullNamePopup = this.phaserObjects.fullNamePopup = scene.add.text(this.container.startX-20,playlistBG.y+10,'full name of file', {...headingFont, ...{color: '#CCCCCC'}}).setOrigin(1,0.5).setDepth(consts.depths.fullNamePopup);
         this.showFullNamePopup(false);
 
         // FINALLY ADD THE ICONS THAT CONTROL THE CURRENT LIST
@@ -248,9 +251,6 @@ let AudioPlayer = class {
     // it pushes the current tracks saved data to the screen saver
     addMinfoDataToScreenSaver() {
         if (!this.moreInfo || !this.currentTrackInt) return false;
-        
-        if (this.minfoPassedToScreenSaver) return;
-        this.minfoPassedToScreenSaver=true;
 
         let minfo = this.moreInfo;
         let trackName = this.playlist[this.currentTrackInt-1];
@@ -461,6 +461,21 @@ let AudioPlayer = class {
         this.savePlaylistIcon.tween.play(); // flash the save icon
         this.flushToLocalStorageTimeout = this.flushToLocalStorageTimeoutMax;
         vars.localStorage.updateSavedPlaylist();
+    }
+
+    generateFullNameBackground(_fullNameObject) {
+        let fNP = _fullNameObject;
+        
+        let x = fNP.x;
+        let y = fNP.y;
+        let w = fNP.width;
+        let h = fNP.height;
+        
+        this.graphics.clear();
+        this.graphics.lineStyle(2,0x666666);
+        this.graphics.fillStyle(0x333333);
+        this.graphics.fillRoundedRect(x-10-w, y-10-h/2, w+20, h+20, 10);
+        this.graphics.strokeRoundedRect(x-10-w,y-10-h/2, w+20, h+20, 10);
     }
 
     getNextOrPreviousTrack(_next=true) {
@@ -774,7 +789,8 @@ let AudioPlayer = class {
         let text = this.playlist[trackInt];
         let fNP = this.phaserObjects.fullNamePopup;
         fNP.setText(text);
-        fNP.y=_gameObject.y+this.startY+20;
+        fNP.y=_gameObject.y+this.startY+10;
+        this.generateFullNameBackground(fNP);
         this.showFullNamePopup();
     }
 
@@ -782,6 +798,7 @@ let AudioPlayer = class {
         if (_show === this.phaserObjects.fullNamePopup.visible) return false;
 
         this.phaserObjects.fullNamePopup.visible=_show;
+        !_show && this.graphics.clear();
     }
 
     showInfoButton(_show=true) {
@@ -944,13 +961,8 @@ let AudioPlayer = class {
     updateMinfoDataToScreenSaver() {
         if (!this.moreInfo) return false;
 
-        vars.DEBUG && console.log(`Updating the minfo on the screen saver`);
-        let minfo = this.moreInfo;
-        debugger;
-        let trackName = this.playlist[this.currentTrackInt-1];
-        let trackData = minfo[trackName];
-        vars.App.screenSaver.updateTrackName(trackData.Track);
-
+        this.addMinfoDataToScreenSaver();
+        return;
     }
 
     updateSavedPlaylist() { // this is called when we change tracks, it resets the position and currentTrackLength
