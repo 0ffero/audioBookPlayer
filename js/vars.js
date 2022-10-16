@@ -2,10 +2,8 @@
 var vars = {
     DEBUG: false,
 
-    version: 1.01,
-    edition: 'ABP101',
-
-    webgl: false,
+    version: 1.1,
+    edition: 'ABP_1.1',
 
     versions: [
         ['1.0', 'Everything is working properly (pretty sure).\
@@ -14,7 +12,8 @@ var vars = {
                  GTX980Tis power o.0). Typing webgl at any time\
                  will switch between on and off'
         ],
-        ['1.01', 'Added a sheen to the screen savers time bar']
+        ['1.01', 'Added a sheen to the screen savers time bar + some nicities added'],
+        ['1.1', 'WEBGL has been completely removed']
     ],
 
     TODO: [
@@ -26,11 +25,7 @@ var vars = {
           I dont think theres a way to fix this in phaser as the\
           problem occurs when the old track is destroyed, then\
           filled with the new one and is played. Chrome doesnt\
-          like that kind of thing, so I doubt theres a real way around it.'],
-        
-        ['Reducing the amount of stuff that requires webgl (tints etc).\
-          Just have to change the way text is highlighted now!\
-          Eventually there will be no reason to use the webgl edition']
+          like that kind of thing, so I doubt theres a real way around it.']
     ],
 
     animationsEnabled: true,
@@ -42,6 +37,11 @@ var vars = {
             default: 0x666666,
             bright_1: 0x999999,
             white: 0xffffff
+        },
+        coloursHTML: {
+            default: '#666666',
+            bright_1: '#999999',
+            white: '#ffffff'
         }
     },
 
@@ -469,7 +469,6 @@ var vars = {
             });
 
             vars.input.initKeys();
-            vars.input.initCombos();
 
             // phaser objects
             scene.input.on('gameobjectdown', function (pointer, gameObject) {
@@ -652,12 +651,12 @@ var vars = {
                 let name = gameObject.name;
                 name.includes('Container') ? (game.canvas.style.cursor='grab') : name=='recentBG' ? (game.canvas.style.cursor='default') : (game.canvas.style.cursor='crosshair');
                 if (name.startsWith('folder_')) {
-                    vars.webgl ? gameObject.setTint(vars.fonts.colours.white) : gameObject.setAlpha(1);
+                    gameObject.setColor(vars.fonts.coloursHTML.white);
                 };
 
                 if (name.startsWith('player_track_')) {
-                    !vars.webgl && gameObject.setAlpha(1);
-                    vars.App.player.showFullName(gameObject);
+                    gameObject.setColor(vars.fonts.coloursHTML.white);
+                    gameObject.isCropped && vars.App.player.showFullName(gameObject);
                 };
 
                 if (name==='longFileBar') {
@@ -674,11 +673,12 @@ var vars = {
                 let name = gameObject.name;
                 game.canvas.style.cursor='default';
                 if (name.startsWith('folder_')) {
-                    vars.webgl ? gameObject.setTint(vars.fonts.colours.bright_1) : gameObject.setAlpha(0.5);
+                    gameObject.setColor(vars.fonts.coloursHTML.bright_1);
+
                 };
 
                 if (name.startsWith('player_track_')) {
-                    !vars.webgl && gameObject.setAlpha(gameObject.selected ? 1: 0.5);
+                    gameObject.setColor(gameObject.selected ? vars.fonts.coloursHTML.white : vars.fonts.coloursHTML.default);
                     vars.App.player.showFullNamePopup(false);
                 };
 
@@ -688,17 +688,6 @@ var vars = {
             });
 
             vars.input.initDrags();
-        },
-        initCombos: ()=> {
-             // COMBOS
-             let sIK = scene.input.keyboard;
-
-             sIK.createCombo('webgl', { resetOnMatch: true });
-             sIK.on('keycombomatch', function (event) {
-                 let comboName = '';
-                 event.keyCodes.forEach( (cC)=> { comboName += String.fromCharCode(cC); });
-                 switch (comboName) { case 'WEBGL': vars.input.switchWEBGL(); break; };
-             });
         },
         initDrags: ()=> {
             scene.input.on('dragstart', function (pointer, gameObject) {
@@ -1023,8 +1012,7 @@ var vars = {
                 paused: true,
             });
             history.tweens = { hide: hide, show: show };
-            let vText = scene.add.text(cC.width-10, cC.height-10, `VERSION: ${vars.version}${vars.version<0.999 ? 'β': vars.version<1 ? 'RC' : vars.version} (${vars.edition})`,vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
-            vars.webgl && scene.add.image(cC.width*0.75, cC.height-10, 'ui','webgl').setOrigin(0.5,1).setDepth(consts.depths.player-1);
+            let vText = scene.add.text(cC.width-10, cC.height-10, vars.edition, vars.fonts.default).setDepth(999).setAlpha(0.1).setOrigin(1);
             let seconds = 1000;
             let delay = 30*seconds;
             vText.tween = scene.add.tween({ targets: vText, delay: delay, duration: 1000, alpha: 0.8, yoyo: true, loop: true});

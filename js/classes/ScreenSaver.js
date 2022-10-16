@@ -62,6 +62,8 @@ let ScreenSaver = class {
                             scene.tweens.add({ targets: tBSheen, alpha: 0, duration: 500, onComplete: ()=> { tBSheen.timer.timerStart(); } });
                         }
                     });
+                } else { // the tB width isnt 2*sheen width, just restart the timer
+                    tBSheen.timer.timerStart();
                 };
             }
         };

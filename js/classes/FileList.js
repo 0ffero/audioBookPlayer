@@ -114,7 +114,7 @@ let FileList = class {
         
         // FIRST DEAL WITH FOLDERS FOUND IN THE SUBFOLDER
         let fLPos = 0;
-        let itemTint = fV.colours.bright_1;
+        let itemTint = fV.coloursHTML.bright_1;
         this.folderList.forEach((_f,_i)=> {
             let entry = Object.entries(vars.localStorage.playlists).find(m=>m[1].folder===_f || m[1].folder.startsWith(_f) || m[1].folder.endsWith(_f));
             let texture = !entry ? 'neverAccessed' : entry[1].complete ? 'complete' : 'incomplete';
@@ -122,7 +122,7 @@ let FileList = class {
 
             let folderIcon = scene.add.image(startXY.x, startXY.y, 'ui', 'folderIcon').setOrigin(0);
             folderIcon.fLPos=fLPos;
-            let folderName = scene.add.text(startXY.x+60, startXY.y+5, _f, font).setName(`folder_${_i}`).setData({subFolder: true, parentFolder: this.folderName, folderName: _f }).setTint(itemTint).setInteractive();
+            let folderName = scene.add.text(startXY.x+60, startXY.y+5, _f, font).setName(`folder_${_i}`).setData({subFolder: true, parentFolder: this.folderName, folderName: _f }).setColor(itemTint).setInteractive();
             folderName.fLPos=fLPos;
             if (folderName.y+folderName.height>this.maxContainerHeight) {
                 folderIcon.setVisible(false); folderName.setVisible(false);
@@ -147,7 +147,7 @@ let FileList = class {
             let fileIcon = scene.add.image(startXY.x, startXY.y, 'ui', 'audioFileIcon').setOrigin(0);
             fileIcon.fLPos = fLPos;
             let fileNameSansExt = _f.replace(consts.fileExtensionRegEx,'');
-            let fileName = scene.add.text(startXY.x+60, startXY.y+5, fileNameSansExt, font).setName(`file_${_i}`).setTint(itemTint);
+            let fileName = scene.add.text(startXY.x+60, startXY.y+5, fileNameSansExt, font).setName(`file_${_i}`).setColor(itemTint);
             fileName.fLPos = fLPos;
             if (fileName.y+fileName.height>this.maxContainerHeight) {
                 fileIcon.setVisible(false); fileName.setVisible(false);
@@ -170,7 +170,7 @@ let FileList = class {
         startXY.y += 15;
         let addAllIcon = scene.add.image(startXY.x-20, startXY.y, 'ui', 'addAllIcon').setOrigin(0);
         addAllIcon.fLPos=fLPos;
-        let addAllText = scene.add.text(startXY.x+60, startXY.y+5, 'Add All Files', font).setName(`addAll`).setTint(itemTint).setInteractive();
+        let addAllText = scene.add.text(startXY.x+60, startXY.y+5, 'Add All Files', font).setName(`addAll`).setColor(fV.coloursHTML.white).setInteractive();
         addAllText.fLPos=fLPos;
         if (addAllText.y+addAllText.height>this.maxContainerHeight) {
             addAllIcon.setVisible(false); addAllText.setVisible(false);

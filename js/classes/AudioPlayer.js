@@ -385,7 +385,7 @@ let AudioPlayer = class {
         let y = this.phaserObjects.playlistBG.y + intPadding/3;
         let fV = vars.fonts;
         let font = fV.default;
-        let colours = fV.colours;
+        let colours = fV.coloursHTML;
 
         this.listMinY = y;
 
@@ -402,18 +402,18 @@ let AudioPlayer = class {
         this.playlist.forEach((_entry,_i)=> {
             let vis = _i<this.maxFilesPerPage ? true : false;
             let trackIntText = scene.add.text(x, y, currentTrackInt.toString().padStart(padStart,'0'), font).setVisible(vis); // origin for text objects are always 0 (not 0.5)
-            vars.webgl ? trackIntText.setTint(colours.default) : trackIntText.setAlpha(0.25);
+            trackIntText.setColor(colours.default);
             trackIntText.fLPos=fLPos;
             !height && ( height = trackIntText.height );
 
             let isCurrentTrack = currentTrackInt===this.currentTrackInt ? true : false;
-            let tint = isCurrentTrack ? colours.white : colours.default;
+            let colour = isCurrentTrack ? colours.white : colours.default;
             
             let entrySansExt = _entry.replace(consts.fileExtensionRegEx,'');
             let trackText = scene.add.text(x+intPadding, y, entrySansExt, font).setVisible(vis).setName(`player_track_${_i}`).setInteractive();
             trackText.trackInt = _i;
             trackText.selected = isCurrentTrack;
-            vars.webgl ? trackText.setTint(tint) : trackText.setAlpha(isCurrentTrack ? 1: 0.5);
+            trackText.setColor(colour);
             this.cropObject(trackText);
             trackText.fLPos=fLPos;
             trackTextObjects.push(trackIntText, trackText);

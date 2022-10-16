@@ -1,10 +1,9 @@
 vars.DEBUG && console.log('Initialising...');
 
 // if the lS options doesnt exist - assume webgl, else load the value from lS
-if (!window.localStorage['ABP_options']) { vars.webgl = false; } else { vars.webgl = JSON.parse(window.localStorage['ABP_options']).webgl; };
 var config = {
     title: "Audio Book Player",
-    type: vars.webgl ? Phaser.WEBGL : Phaser.CANVAS,
+    type: Phaser.CANVAS,
     version: vars.version,
     url: window.location.href,
 

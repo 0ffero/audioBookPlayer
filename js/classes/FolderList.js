@@ -22,7 +22,7 @@ let FolderList = class {
     drawFolderList() {
         let fV = vars.fonts;
         let font = fV.default;
-        let tint = fV.colours.bright_1;
+        let colour = fV.coloursHTML.bright_1;
         let startXY = { x: 10, y: 10 };
         let yInc = 42;
 
@@ -35,8 +35,8 @@ let FolderList = class {
             let folderIcon = scene.add.image(startXY.x+40, startXY.y, 'ui', 'folderIcon').setOrigin(0);
             let folderName = scene.add.text(startXY.x+110, startXY.y+5, _f, font).setName(`folder_${_i}`).setInteractive();
             let w = folderName.x+folderName.width + 20;
+            folderName.setColor(colour);
             w>width && (width=w);
-            vars.webgl ? folderName.setTint(tint) : folderName.setAlpha(0.5);
             folderName.setData({ folderName: _f });
             
             startXY.y += yInc;
