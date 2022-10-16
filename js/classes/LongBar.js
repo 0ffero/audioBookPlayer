@@ -71,9 +71,8 @@ let LongBar = class {
         // if webgl isnt enabled, we have to add a black background as we cant tint it (hence alpha change is required, but the BG cant be transparent);
         let bgbgWidth = width+40;
         let barBGBG = scene.add.image(-20,-20,'blackpixel').setScale(bgbgWidth,1).setOrigin(0); // scaleY will be set when we know the height of the container
-        let barBG = scene.add.image(x,y,'whitepixel').setScale(width,height).setOrigin(0);
+        let barBG = scene.add.image(x,y,'pixel6').setScale(width,height).setOrigin(0);
         let seekTime = this.phaserObjects.seekTime = scene.add.text(this.width/2, barBG.y + barBG.displayHeight/2, '0:00:00', this.font).setOrigin(0.5);
-        vars.webgl ? barBG.setTint(0x666666) : barBG.setAlpha(0.4);
         container.add([barBGBG,longBarPointer,barBG,seekTime]);
 
         // draw the position spikes and times

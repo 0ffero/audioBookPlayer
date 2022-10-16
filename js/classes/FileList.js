@@ -54,9 +54,7 @@ let FileList = class {
 
         this.filesGroup = scene.add.group().setName('files');
 
-        let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
-        let bg = this.phaserObjects.containerBG = scene.add.image(0,0,texture).setName('fileListBG').setOrigin(0).setAlpha(0.95);
-        vars.webgl && bg.setTint(0x222222);
+        let bg = this.phaserObjects.containerBG = scene.add.image(0,0,'pixel2').setName('fileListBG').setOrigin(0).setAlpha(0.95);
         this.container.add(bg);
 
     }

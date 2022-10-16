@@ -295,8 +295,7 @@ let AudioPlayer = class {
         let percent = 1;
 
         let height = percent*availableHeight;
-        let scrollBar = this.phaserObjects.scrollBar = scene.add.image(x,y,'whitepixel').setOrigin(1,0).setScale(width,height).setName('scrollBarPlayer').setInteractive();
-        vars.webgl ? scrollBar.setTint(0x999999) : scrollBar.setAlpha(0.75);
+        let scrollBar = this.phaserObjects.scrollBar = scene.add.image(x,y,'pixel9').setOrigin(1,0).setScale(width,height).setName('scrollBarPlayer').setInteractive();
         scrollBar.minY = scrollBar.y;
         scrollBar.maxY = scrollBar.y + availableHeight;
         scrollBar.maxHeight = scrollBar.displayHeight;

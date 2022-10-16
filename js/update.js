@@ -6,6 +6,7 @@ function update() {
 
         player.update();
 
+        App.screenSaver && App.screenSaver.update();
         App.longBar && App.longBar.update();
     };
 };

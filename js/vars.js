@@ -2,12 +2,36 @@
 var vars = {
     DEBUG: false,
 
-    version: 1.0,
-    edition: 'ABP1',
+    version: 1.01,
+    edition: 'ABP101',
 
     webgl: false,
 
-    TODO: [],
+    versions: [
+        ['1.0', 'Everything is working properly (pretty sure).\
+                 Some minor bugs remain, probably. Now defaults\
+                 to NOT using webgl (as it uses about 35% of my\
+                 GTX980Tis power o.0). Typing webgl at any time\
+                 will switch between on and off'
+        ],
+        ['1.01', 'Added a sheen to the screen savers time bar']
+    ],
+
+    TODO: [
+        ['The tracks stop playing when moving on to the next if\
+          the browser is minimised. Howler appears to be able to\
+          stream a playlist without this pause, however Ive not\
+          checked the source code to see if its simply loading all\
+          tracks at once.\
+          I dont think theres a way to fix this in phaser as the\
+          problem occurs when the old track is destroyed, then\
+          filled with the new one and is played. Chrome doesnt\
+          like that kind of thing, so I doubt theres a real way around it.'],
+        
+        ['Reducing the amount of stuff that requires webgl (tints etc).\
+          Just have to change the way text is highlighted now!\
+          Eventually there will be no reason to use the webgl edition']
+    ],
 
     animationsEnabled: true,
 
@@ -76,20 +100,12 @@ var vars = {
             }
         },
 
-        plugins: {
-            load: ()=> {
-                vars.webgl && scene.load.plugin('rexglowfilterpipelineplugin', 'plugins/rexglowfilterpipelineplugin.min.js', true);
-            }
-        },
-
         loadAssets: ()=> {
             scene.load.setPath('assets');
 
             let fV = vars.files;
             fV.audio.load();
-            //fV.fonts.load();
             fV.images.load();
-            fV.plugins.load();
             scene.load.setPath('');
         }
     },
@@ -154,6 +170,7 @@ var vars = {
             if (!scene.containers[_containerName]) return false;
 
             let container = scene.containers[_containerName];
+            if (container.alpha===alpha) return; // make sure the containers current alpha isnt already the requested alpha
 
             // if animations are disabled we simply set the new alpha
             if (!vars.animationsEnabled) {
@@ -396,7 +413,7 @@ var vars = {
         init: ()=> {
             vars.DEBUG ? console.log(`%cFN: audio > init`, `${consts.console.defaults} ${consts.console.colours.functionCall}`) : null;
 
-            scene.sound.volume = vars.localStorage.options.volume||0.4;// keep it nice and quiet while debuging
+            scene.sound.volume = vars.localStorage.options.volume||0.4; // NOTE: this will ignore the saved volume if its 0 and reset it back to 0.4. This saves the user wondering why they cant hear their book
         },
 
         changeVolume: (_increase=true)=> {
@@ -526,7 +543,16 @@ var vars = {
                 };
                 if (name==='info') { // only shows the screen saver (book over view) if a track is playing
                     let player = vars.App.player;
-                    player.track && player.playing && vars.containers.fadeIn('screenSaver',true,1);
+                    if (player.track && player.playing) {
+                        let sS = vars.App.screenSaver;
+                        if (!sS.container.alpha) { // is the container hidden?
+                            let delay = vars.containers.fadeIn('screenSaver',true,1); // show it
+                            delay*=1.1; // just making sure the screensaver fades in completely before starting the sheen timer
+                            scene.tweens.addCounter({
+                                from: 0, to: 1, duration: delay, onComplete: ()=> { sS.phaserObjects.timeBarSheen.timer.timerStart(); }
+                            })
+                        };
+                    };
                     return;
                 };
                 if (name==='pause') {
@@ -642,8 +668,6 @@ var vars = {
                     };
                     vars.App.longBar.disableFadeOut();
                 };
-                // GLOWS ON
-                if (vars.webgl && gameObject.glow) { let glow = name==='trackPositionPointer' ? 0.02 : 0.005; gameObject.glow.setIntensity(glow); return; };
             });
 
             scene.input.on('gameobjectout', function (pointer, gameObject) {
@@ -661,8 +685,6 @@ var vars = {
                 if (name==='longFileBar') {
                     vars.App.longBar.startFadeOutDelay();
                 };
-                // GLOWS OFF
-                if (gameObject.glow) { gameObject.glow.setIntensity(0); return; };
             });
 
             vars.input.initDrags();
@@ -963,7 +985,7 @@ var vars = {
 
     plugins: {
         add: (_gameObjects)=> {
-            if (!vars.webgl) return false;
+            return false;
 
             if (!checkType(_gameObjects,'array')) _gameObjects = [_gameObjects];
 
@@ -1116,10 +1138,7 @@ var vars = {
 
         generateBackground: ()=> {
             let cC = consts.canvas;
-            let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
-            let bg = scene.add.image(cC.cX, cC.cY, texture).setScale(cC.width, cC.height);
-            vars.webgl && bg.setTint(0x0);
-
+            let bg = scene.add.image(cC.cX, cC.cY, 'blackpixel').setScale(cC.width, cC.height);
             return bg;
         },
 

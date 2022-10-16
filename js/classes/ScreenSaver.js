@@ -21,27 +21,57 @@ let ScreenSaver = class {
         let fontLarge = { ...fV.default, ...{ fontSize: '52px', color: '#999999'}};
         let fontSmall = { ...fV.default, ...{ fontSize: '42px', color: '#666666'}};
         let pO = this.phaserObjects;
-        let texture = vars.webgl ? 'whitepixel' : 'blackpixel';
-        pO.bg = scene.add.image(cC.cX, cC.cY,texture).setScale(cC.width,cC.height).setName('screenSaverBG').setInteractive();
-        vars.webgl && pO.bg.setTint(0x0);
+        pO.bg = scene.add.image(cC.cX, cC.cY,'blackpixel').setScale(cC.width,cC.height).setName('screenSaverBG').setInteractive();
         
         let x = 100;
         pO.folderText = scene.add.text(x,  cC.height*0.1, 'FOLDERNAME GOES HERE', fontLarge);
 
         pO.trackNameText = scene.add.text(x,  cC.height*0.2, 'CURRENT FILENAME GOES HERE', fontSmall);
 
-        pO.currentTrackIntAndTime = scene.add.text(x,  cC.height*0.3, 'Current track # 00:00:00 of 00:00:00', fontSmall);
+        pO.currentTrackIntAndTime = scene.add.text(x,  cC.height*0.3, 'Current track # 00:00 of 00:00', fontSmall);
 
-        let tBTexture = vars.webgl ? 'whitepixel' : 'positionBarPixel';
-        pO.timeBar = scene.add.image(0,cC.height,tBTexture).setScale(cC.width,30).setOrigin(0,1);
-        vars.webgl && pO.timeBar.setTint(0x0085B2);
+        pO.timeBar = scene.add.image(0,cC.height,'positionBarPixel').setScale(cC.width,30).setOrigin(0,1);
+        let tBSheen = pO.timeBarSheen = scene.add.image(0,cC.height,'screenSaver','positionBarSheen').setOrigin(0,1).setAlpha(0);
+        let sheenTimeOut = 5*60;
+        tBSheen.timer = {
+            current: sheenTimeOut,
+            max: sheenTimeOut,
+            timerDecrement: ()=> {
+                if (!tBSheen.timer.current) return false;
+                tBSheen.timer.current--;
+                if (!tBSheen.timer.current) { tBSheen.timer.animate(); };
+            },
+            timerStart: ()=> {
+                tBSheen.timer.current=tBSheen.timer.max;
+            },
+            timerStop: ()=> {
+                if (!tBSheen.timer.current) return false;
+                tBSheen.timer.current=0;
+                return true;
+            },
+            animate: ()=> {
+                let tB = pO.timeBar;
+                if (tB.displayWidth>tBSheen.width*2){
+                    // reset the sheens x and show it
+                    tBSheen.x=0;
+                    tBSheen.alpha=0.3;
+                    let maxX = tB.displayWidth-tBSheen.width;
+                    scene.tweens.add({
+                        targets: tBSheen, x: maxX, duration: 1000, // tween to maxX
+                        onComplete: ()=> { // hide it again
+                            scene.tweens.add({ targets: tBSheen, alpha: 0, duration: 500, onComplete: ()=> { tBSheen.timer.timerStart(); } });
+                        }
+                    });
+                };
+            }
+        };
 
         pO.coverImage = scene.add.image(cC.width*0.75,cC.cY,'screenSaver','noBooksImages').setName('screenSaverBookImage');
         let cR = pO.coverImage.getRightCenter();
         pO.internetSearch = scene.add.image(cR.x-80,cR.y,'screenSaver','internetIcon').setOrigin(1,0.6).setName('internetSearch').setInteractive();
 
 
-        this.container.add([pO.bg,pO.folderText,pO.trackNameText,pO.currentTrackIntAndTime,pO.timeBar,pO.coverImage,pO.internetSearch]);
+        this.container.add([pO.bg,pO.folderText,pO.trackNameText,pO.currentTrackIntAndTime,pO.timeBar,pO.timeBarSheen,pO.coverImage,pO.internetSearch]);
 
         this.container.alpha=0;
 
@@ -160,8 +190,9 @@ let ScreenSaver = class {
 
     hide() { // the screen saver can ONLY be hidden IF its ALPHA is 1
         if (this.container.alpha===1) {
+            let sheen = this.phaserObjects.timeBarSheen;
             let delay = vars.containers.fadeIn('screenSaver', false);
-            scene.tweens.addCounter({ from: 0, to: 1, duration: delay, onComplete: vars.App.player.resetScreenSaverTimeout })
+            scene.tweens.addCounter({ from: 0, to: 1, duration: delay, onComplete: ()=> { sheen.timer.timerStop(); vars.App.player.resetScreenSaverTimeout; } })
         };
     }
 
@@ -225,6 +256,12 @@ let ScreenSaver = class {
 
 
     update() {
+        let sheen = this.phaserObjects.timeBarSheen;
+        if (this.container.alpha===1) {
+            sheen.timer.current && sheen.timer.timerDecrement();
+        } else {
+            sheen && sheen.timer.current && sheen.timer.timerStop();
+        };
         // NOTE: THE PLAYER UPDATES THE CURRENT TRACK NUMBER AND TIME, SO ITS NOT NEEDED HERE
     }
 
